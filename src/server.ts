@@ -359,7 +359,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'),
               new HumanMessage(prompt)
-            ], { model: 'gemini-flash-latest' });
+            ], { model: 'deepseek-v4-pro' });
 
             for await (const chunk of stream) {
               const content = chunk.content;
@@ -526,7 +526,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         `;
 
         const result = await callLlm(prompt, {
-          model: 'gemini-flash-latest',
+          model: 'deepseek-v4-pro',
           systemPrompt: 'Sen üst düzey, profesyonel bir BIST ve TEFAS Portföy Yöneticisisin. Müşterilerine stratejik, analitik ve risksiz portföy sepetleri tasarlarsın.'
         });
 
@@ -715,9 +715,10 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       return new Response(new ReadableStream({
         async start(controller) {
           try {
-            const body = await req.json() as { query?: string, sessionId?: string };
+            const body = await req.json() as { query?: string, sessionId?: string, model?: string };
             const query = body.query;
             const sessionId = body.sessionId || 'default';
+            const selectedModel = body.model || 'deepseek-v4-pro';
             if (!query) {
               controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error', error: 'Query is required' })}\n\n`));
               controller.close();
@@ -725,13 +726,13 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
             }
 
             if (!chatSessions[sessionId]) {
-              chatSessions[sessionId] = new InMemoryChatHistory('gemini-flash-latest', 15);
+              chatSessions[sessionId] = new InMemoryChatHistory(selectedModel, 15);
             }
             const history = chatSessions[sessionId];
             touchSession(sessionId);
             
             const agent = await Agent.create({ 
-              model: 'gemini-flash-latest',
+              model: selectedModel,
               memoryEnabled: false // Disable vector DB memory (memory_search) which takes too long, keep chat history only.
             });
             let fullAnswer = '';

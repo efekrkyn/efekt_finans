@@ -141,6 +141,7 @@ export default function App() {
   const [compareStocks, setCompareStocks] = useState<AnalysisResult[]>([]);
 
   // AI Assistant State
+  const [aiChatModel, setAiChatModel] = useState('deepseek-v4-pro');
   const [assistantMessages, setAssistantMessages] = useState<{role: 'user'|'assistant'|'system', content: string}[]>([
     { role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }
   ]);
@@ -514,7 +515,7 @@ export default function App() {
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, sessionId })
+        body: JSON.stringify({ query, sessionId, model: aiChatModel })
       });
 
       if (!response.body) throw new Error('No body');
@@ -1296,12 +1297,22 @@ export default function App() {
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <MessageSquare size={24} color="var(--accent-primary)" /> AI Finansal Asistan
                 </h2>
-                <button 
-                  onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }])}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
-                >
-                  Geçmişi Temizle
-                </button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <select
+                    value={aiChatModel}
+                    onChange={(e) => setAiChatModel(e.target.value)}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 12px', borderRadius: '8px', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="deepseek-v4-pro">DeepSeek V4 Pro (Düşünen)</option>
+                    <option value="deepseek-v4-flash">DeepSeek V4 Flash (Hızlı)</option>
+                  </select>
+                  <button 
+                    onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }])}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
+                  >
+                    Geçmişi Temizle
+                  </button>
+                </div>
               </div>
               
               <div ref={scrollRef} style={{ flex: 1, backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '16px' }}>
