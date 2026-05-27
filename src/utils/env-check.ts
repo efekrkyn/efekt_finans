@@ -1,6 +1,6 @@
 export function checkEnv() {
-  const required = ['FINANCIAL_DATASETS_API_KEY'] as const;
-  const optional = ['GOOGLE_API_KEY','OPENAI_API_KEY','ANTHROPIC_API_KEY','TAVILY_API_KEY','EXASEARCH_API_KEY'] as const;
+  const required = [] as const;
+  const optional = ['FINANCIAL_DATASETS_API_KEY','GOOGLE_API_KEY','OPENAI_API_KEY','ANTHROPIC_API_KEY','TAVILY_API_KEY','EXASEARCH_API_KEY'] as const;
   const missingRequired = required.filter(k => !process.env[k]);
   if (missingRequired.length) {
     console.error('❌ Eksik kritik env: ' + missingRequired.join(', '));
