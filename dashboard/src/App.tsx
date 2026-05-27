@@ -104,6 +104,13 @@ export default function App() {
   const [assistantStatus, setAssistantStatus] = useState('');
 
   const [marketSummary, setMarketSummary] = useState<MarketSummary | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
   const [kapDisclosures, setKapDisclosures] = useState<{title:string, url:string, snippet:string, publishedDate:string|null}[]>([]);
   const [kapLoading, setKapLoading] = useState(false);
   const [dividends, setDividends] = useState<{date:string, amount:number}[]>([]);
@@ -218,10 +225,15 @@ export default function App() {
       });
       if (newTriggers.length) {
         setTriggeredAlerts(prev => [...prev, ...newTriggers]);
-        if ('Notification' in window && Notification.permission === 'granted') {
-          newTriggers.forEach(a => new Notification(`${a.ticker} hedefe ulaştı`, {
-            body: `${a.condition === 'above' ? '≥' : '≤'} ${a.price} ₺ (güncel: ${prices[a.ticker].toFixed(2)} ₺)`
-          }));
+        if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+          navigator.serviceWorker.ready.then(reg => {
+            newTriggers.forEach(a => reg.showNotification(`${a.ticker} hedefe ulaştı`, {
+              body: `${a.condition === 'above' ? '≥' : '≤'} ${a.price} ₺ (güncel: ${prices[a.ticker].toFixed(2)} ₺)`,
+              icon: '/icon.svg',
+              badge: '/icon.svg',
+              tag: a.id
+            }));
+          });
         }
         setAlerts(prev => prev.filter(a => !newTriggers.find(t => t.id === a.id)));
       }
@@ -694,6 +706,15 @@ export default function App() {
           </div>
           
           <div style={{ display: isMobile ? 'none' : 'flex', gap: '32px', marginLeft: 'auto', alignItems: 'center' }}>
+            {installPrompt && (
+              <button onClick={async () => {
+                await installPrompt.prompt();
+                setInstallPrompt(null);
+              }}
+                style={{padding:'8px 16px', borderRadius:8, border:'1px solid var(--accent-primary)', backgroundColor:'transparent', color:'var(--accent-primary)', fontWeight:700, cursor:'pointer', fontSize:'0.85rem'}}>
+                📲 Yükle
+              </button>
+            )}
             <div style={{ position: 'relative' }}>
               <button aria-label={`Bildirimler (${alerts.length} aktif, ${triggeredAlerts.length} tetiklendi)`}
                 onClick={async () => {
