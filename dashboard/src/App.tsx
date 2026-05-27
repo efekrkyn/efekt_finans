@@ -109,7 +109,7 @@ export default function App() {
     }
   }, [theme]);
 
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,6 +162,19 @@ export default function App() {
   type GlobalAsset = { ticker:string, companyName:string, currentPrice:number, change:number, currency:string, assetType:string };
   const [globalAssets, setGlobalAssets] = useState<GlobalAsset[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
+
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'heatmap' && heatmapData.length === 0) {
+      setHeatmapLoading(true);
+      fetch('/api/heatmap')
+        .then(r => r.json())
+        .then(d => { setHeatmapData(d); setHeatmapLoading(false); })
+        .catch(() => setHeatmapLoading(false));
+    }
+  }, [activeTab]);
 
   const GLOBAL_SYMBOLS = {
     'ABD Hisseleri': ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA'],
@@ -679,6 +692,7 @@ export default function App() {
             { id: 'agenda', label: 'Ajanda', icon: Calendar, active: activeTab === 'agenda' },
             { id: 'screener', label: 'Tarayıcı', icon: Search, active: activeTab === 'screener' },
             { id: 'global', label: 'Global', icon: TrendingUp, active: activeTab === 'global' },
+            { id: 'heatmap', label: 'Heatmap', icon: LayoutGrid, active: activeTab === 'heatmap' },
             { id: 'assistant', label: 'AI Asistan', icon: MessageSquare, active: activeTab === 'assistant' }
           ].map(item => (
             <ClickableCard 
@@ -691,6 +705,7 @@ export default function App() {
                 if (item.id === 'agenda') { setActiveTab('agenda'); }
                 if (item.id === 'screener') { setData(null); setActiveTab('screener'); }
                 if (item.id === 'global') { setData(null); setActiveTab('global'); }
+                if (item.id === 'heatmap') { setData(null); setActiveTab('heatmap'); }
                 if (item.id === 'assistant') { setData(null); setActiveTab('assistant'); }
                 if (isMobile) setSidebarOpen(false);
               }}
@@ -1075,6 +1090,39 @@ export default function App() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {activeTab === 'heatmap' && (
+            <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
+              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:24}}>BIST 30 Heatmap</h2>
+              {heatmapLoading ? (
+                <div style={{color:'var(--text-muted)', textAlign:'center', padding:40}}><Loader2 className="spinner" size={32} /> Yükleniyor...</div>
+              ) : (
+                <div style={{display:'flex', flexWrap:'wrap', gap:4, alignContent:'flex-start'}}>
+                  {heatmapData.map(d => {
+                    const absChange = Math.abs(d.change);
+                    // intensity 0 to 1 based on 0% to 5% change
+                    const intensity = Math.min(absChange / 5, 1);
+                    const baseColor = d.change >= 0 ? 'var(--accent-primary-rgb)' : 'var(--accent-negative-rgb)';
+                    const bg = `rgba(${baseColor}, ${0.2 + intensity * 0.8})`;
+                    const widthClass = d.marketCap > 100000000000 ? '24%' : d.marketCap > 50000000000 ? '16%' : '12%';
+                    return (
+                      <div key={d.ticker} title={d.companyName} style={{
+                        flex: `1 1 ${widthClass}`,
+                        minWidth: 80,
+                        height: 80,
+                        backgroundColor: bg,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', borderRadius: 4, cursor: 'pointer', border: '1px solid var(--glass-border)'
+                      }}>
+                        <div style={{fontWeight:800, fontSize:'1rem'}}>{d.ticker}</div>
+                        <div style={{fontSize:'0.8rem', fontWeight:600}}>{d.change > 0 ? '+' : ''}{d.change.toFixed(2)}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

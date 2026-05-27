@@ -646,6 +646,36 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
+    if (path === '/api/heatmap') {
+      try {
+        const cached = cacheGet('heatmap');
+        if (cached) return new Response(JSON.stringify(cached), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+
+        const bist30Symbols = ['AKBNK.IS','ALARK.IS','ARCLK.IS','ASELS.IS','ASTOR.IS','BIMAS.IS','BRSAN.IS','CWDEN.IS','ENKAI.IS','EREGL.IS','FROTO.IS','GARAN.IS','GUBRF.IS','HEKTS.IS','ISCTR.IS','KCHOL.IS','KONTR.IS','KOZAL.IS','KOZAA.IS','KRDMD.IS','MIATK.IS','ODAS.IS','OYAKC.IS','PETKM.IS','PGSUS.IS','SAHOL.IS','SASA.IS','SISE.IS','TCELL.IS','THYAO.IS','TOASO.IS','TUPRS.IS','YKBNK.IS'];
+        
+        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+        const quotes = await Promise.all(
+          bist30Symbols.map(async (sym) => {
+            try {
+              const q = await yahooFinance.quote(sym);
+              return {
+                ticker: sym.replace('.IS',''),
+                companyName: q.shortName || sym,
+                change: q.regularMarketChangePercent || 0,
+                price: q.regularMarketPrice || 0,
+                marketCap: q.marketCap || 0
+              };
+            } catch { return null; }
+          })
+        );
+        const results = quotes.filter(q => q !== null);
+        cacheSet('heatmap', results, 5*60);
+        return new Response(JSON.stringify(results), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      } catch (err) {
+        return new Response(JSON.stringify({error:(err as Error).message}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      }
+    }
+
     // 2.7. API: Market Summary (Top Bar)
     if (path === '/api/market-summary') {
       try {
