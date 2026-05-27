@@ -523,6 +523,26 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
+    // 2.65. API: Dividends history
+    if (path === '/api/dividends') {
+      const ticker = url.searchParams.get('ticker');
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      try {
+        const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
+        const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+        const end = new Date();
+        const start = new Date(); start.setFullYear(end.getFullYear() - 5);
+        const result: any = await yf.chart(symbol, { period1: start, period2: end, interval: '1d', events: 'div' });
+        const dividends = (result.events?.dividends || []).map((d: any) => ({
+          date: d.date,
+          amount: d.amount
+        })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return new Response(JSON.stringify({ticker, dividends}), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      } catch (err) {
+        return new Response(JSON.stringify({error:(err as Error).message, dividends:[]}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      }
+    }
+
     // 2.7. API: Market Summary (Top Bar)
     if (path === '/api/market-summary') {
       try {

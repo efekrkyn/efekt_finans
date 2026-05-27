@@ -105,6 +105,7 @@ export default function App() {
   const [marketSummary, setMarketSummary] = useState<MarketSummary | null>(null);
   const [kapDisclosures, setKapDisclosures] = useState<{title:string, url:string, snippet:string, publishedDate:string|null}[]>([]);
   const [kapLoading, setKapLoading] = useState(false);
+  const [dividends, setDividends] = useState<{date:string, amount:number}[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
 
   const [priceHistory, setPriceHistory] = useState<{points: {date: string, close: number, volume: number}[]} | null>(null);
@@ -268,6 +269,10 @@ export default function App() {
         .then(j => setKapDisclosures(j.disclosures || []))
         .catch(e => console.error('KAP:', e))
         .finally(() => setKapLoading(false));
+      fetch(`/api/dividends?ticker=${encodeURIComponent(ticker)}`)
+        .then(r => r.json())
+        .then(j => setDividends(j.dividends || []))
+        .catch(e => console.error('Dividends:', e));
       setAiAnalysis('');
       setAiSentiment(null);
       setActiveTab('quarterly');
@@ -1074,6 +1079,41 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Temettü Tarihçesi */}
+                {dividends.length > 0 && (
+                  <div style={{marginTop:32}}>
+                    <h3 style={{fontSize:'1.2rem', fontWeight:800, marginBottom:16, display:'flex', alignItems:'center', gap:8}}>
+                      <Briefcase size={20} color="var(--accent-primary)" />
+                      Temettü Geçmişi (Son 5 Yıl)
+                    </h3>
+                    <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:24}}>
+                      <div style={{backgroundColor:'rgba(255,255,255,0.02)', padding:20, borderRadius:12, border:'1px solid var(--glass-border)'}}>
+                        <div style={{maxHeight:240, overflowY:'auto'}}>
+                          {dividends.map((d, i) => (
+                            <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom: i === dividends.length-1 ? 'none' : '1px solid var(--glass-border)'}}>
+                              <span style={{color:'var(--text-muted)'}}>{new Date(d.date).toLocaleDateString('tr-TR', {day:'numeric', month:'long', year:'numeric'})}</span>
+                              <span style={{fontWeight:700, color:'var(--accent-primary)'}}>{d.amount.toFixed(4)} ₺</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{backgroundColor:'rgba(255,255,255,0.02)', padding:20, borderRadius:12, border:'1px solid var(--glass-border)'}}>
+                        <div style={{color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:8}}>Son 12 Ay Toplam</div>
+                        <div style={{fontSize:'1.6rem', fontWeight:800, color:'var(--accent-primary)', marginBottom:16}}>
+                          {dividends.filter(d => Date.now() - new Date(d.date).getTime() < 365*24*60*60*1000).reduce((s,d)=>s+d.amount, 0).toFixed(2)} ₺
+                        </div>
+                        <div style={{color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:8}}>Temettü Verimi (12A)</div>
+                        <div style={{fontSize:'1.4rem', fontWeight:700}}>
+                          {(() => {
+                            const yr = dividends.filter(d => Date.now() - new Date(d.date).getTime() < 365*24*60*60*1000).reduce((s,d)=>s+d.amount, 0);
+                            return data.currentPrice > 0 ? `%${(yr/data.currentPrice*100).toFixed(2)}` : '-';
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Teknik Analiz Göstergeleri (Mock) */}
                 <div style={{ marginTop: '32px' }}>
