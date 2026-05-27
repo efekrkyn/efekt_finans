@@ -490,6 +490,39 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
+    // 2.6. API: KAP Disclosures (Tavily üzerinden filtrelenmiş)
+    if (path === '/api/kap') {
+      const ticker = url.searchParams.get('ticker');
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      try {
+        const apiKey = process.env.TAVILY_API_KEY;
+        if (!apiKey || apiKey.startsWith('your-')) {
+          return new Response(JSON.stringify({disclosures: [], note: 'TAVILY_API_KEY tanımlı değil — KAP verisi yok'}), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+        }
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            api_key: apiKey,
+            query: `site:kap.org.tr ${ticker} özel durum açıklaması bildirim`,
+            search_depth: 'basic',
+            max_results: 10,
+            include_domains: ['kap.org.tr']
+          })
+        });
+        const data = await response.json() as any;
+        const disclosures = (data.results || []).map((r: any) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.content?.slice(0, 200) || '',
+          publishedDate: r.published_date || null
+        }));
+        return new Response(JSON.stringify({ticker, disclosures}), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      } catch (err) {
+        return new Response(JSON.stringify({error:(err as Error).message, disclosures:[]}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      }
+    }
+
     // 2.7. API: Market Summary (Top Bar)
     if (path === '/api/market-summary') {
       try {

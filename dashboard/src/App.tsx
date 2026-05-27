@@ -73,7 +73,7 @@ function getSessionId() {
 const sessionId = getSessionId();
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -103,6 +103,8 @@ export default function App() {
   const [assistantStatus, setAssistantStatus] = useState('');
 
   const [marketSummary, setMarketSummary] = useState<MarketSummary | null>(null);
+  const [kapDisclosures, setKapDisclosures] = useState<{title:string, url:string, snippet:string, publishedDate:string|null}[]>([]);
+  const [kapLoading, setKapLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
 
   const [priceHistory, setPriceHistory] = useState<{points: {date: string, close: number, volume: number}[]} | null>(null);
@@ -259,6 +261,13 @@ export default function App() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Veri alınamadı');
       setData(json);
+      setKapDisclosures([]);
+      setKapLoading(true);
+      fetch(`/api/kap?ticker=${encodeURIComponent(ticker)}`)
+        .then(r => r.json())
+        .then(j => setKapDisclosures(j.disclosures || []))
+        .catch(e => console.error('KAP:', e))
+        .finally(() => setKapLoading(false));
       setAiAnalysis('');
       setAiSentiment(null);
       setActiveTab('quarterly');
@@ -1105,7 +1114,7 @@ export default function App() {
                     onClick={() => setActiveTab(tab)} 
                     style={{ backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'transparent', color: activeTab === tab ? '#000' : 'var(--text-muted)', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                   >
-                    {tab === 'quarterly' ? 'Çeyreklik' : tab === 'annual' ? 'Yıllık' : tab === 'charts' ? 'Grafikler' : tab === 'ai' ? 'AI Analiz' : 'Karşılaştır'}
+                    {tab === 'quarterly' ? 'Çeyreklik' : tab === 'annual' ? 'Yıllık' : tab === 'charts' ? 'Grafikler' : tab === 'ai' ? 'AI Analiz' : tab === 'compare' ? 'Karşılaştır' : 'KAP Bildirimleri'}
                   </button>
                 ))}
               </div>
@@ -1213,7 +1222,37 @@ export default function App() {
                 </section>
               )}
               
-              {activeTab === 'charts' && (
+
+              {activeTab === 'kap' && (
+                <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
+                  <h3 style={{fontSize:'1.3rem', fontWeight:800, marginBottom:24, display:'flex', alignItems:'center', gap:12}}>
+                    <Activity size={20} color="var(--accent-primary)" />
+                    {data.ticker} — KAP Bildirimleri
+                  </h3>
+                  {kapLoading ? (
+                    <div style={{display:'flex', alignItems:'center', gap:12, color:'var(--accent-primary)'}}>
+                      <Loader2 className="spinner" size={20} /> KAP verisi alınıyor...
+                    </div>
+                  ) : kapDisclosures.length === 0 ? (
+                    <div style={{color:'var(--text-muted)', padding:40, textAlign:'center'}}>
+                      Bu hisse için KAP bildirimi bulunamadı.
+                    </div>
+                  ) : (
+                    <div style={{display:'flex', flexDirection:'column', gap:16}}>
+                      {kapDisclosures.map((d, i) => (
+                        <a key={i} href={d.url} target="_blank" rel="noreferrer"
+                          style={{display:'block', padding:20, backgroundColor:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid var(--glass-border)', textDecoration:'none', color:'inherit', transition:'border-color 0.2s'}}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--glass-border)'}>
+                          <div style={{fontWeight:700, color:'#fff', marginBottom:8, fontSize:'1.05rem'}}>{d.title}</div>
+                          {d.publishedDate && <div style={{fontSize:'0.85rem', color:'var(--accent-primary)', marginBottom:8}}>{new Date(d.publishedDate).toLocaleDateString('tr-TR', {day:'numeric', month:'long', year:'numeric'})}</div>}
+                          <div style={{fontSize:'0.95rem', color:'var(--text-muted)', lineHeight:1.6}}>{d.snippet}</div>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}\n\n              {activeTab === 'charts' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
