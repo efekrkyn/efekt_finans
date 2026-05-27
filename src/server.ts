@@ -550,6 +550,50 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
+    // 2.66. API: Stock Screener
+    if (path === '/api/screener') {
+      try {
+        const minPE = parseFloat(url.searchParams.get('minPE') || '-999999');
+        const maxPE = parseFloat(url.searchParams.get('maxPE') || '999999');
+        const minPB = parseFloat(url.searchParams.get('minPB') || '-999999');
+        const maxPB = parseFloat(url.searchParams.get('maxPB') || '999999');
+        const minRevGrowth = parseFloat(url.searchParams.get('minRevGrowth') || '-999999');
+        
+        const BIST_TICKERS = ['THYAO','TUPRS','KCHOL','AKBNK','ASELS','BIMAS','EREGL','ISCTR','SAHOL','YKBNK','GARAN','SISE','FROTO','PGSUS','TOASO','TCELL','SASA','HEKTS','TTKOM','ALARK','MGROS','DOAS','KRDMD','KOZAL','PETKM','ENJSA','ASTOR','EKGYO','TTRAK','VAKBN','GUBRF','OYAKC','KORDS','SOKM','VESBE','ARCLK','ODAS','KMPUR','HALKB','ENKAI'];
+        
+        const results = await Promise.all(BIST_TICKERS.map(async t => {
+          try {
+            const d = await fetchBISTData(t);
+            return {
+              ticker: d.ticker,
+              companyName: d.companyName,
+              currentPrice: d.currentPrice,
+              trailingPE: d.trailingPE,
+              priceToBook: d.priceToBook,
+              evToEbitda: d.evToEbitda,
+              revenueGrowthYoY: d.scorecard?.revenueGrowthYoY,
+              netIncomeGrowthYoY: d.scorecard?.netIncomeGrowthYoY,
+            };
+          } catch { return null; }
+        }));
+        
+        const filtered = results
+          .filter((r): r is NonNullable<typeof r> => r !== null)
+          .filter(r => {
+            if (r.trailingPE != null) { if (r.trailingPE < minPE || r.trailingPE > maxPE) return false; }
+            else if (minPE > -999999 || maxPE < 999999) return false;
+            if (r.priceToBook != null) { if (r.priceToBook < minPB || r.priceToBook > maxPB) return false; }
+            else if (minPB > -999999 || maxPB < 999999) return false;
+            if (r.revenueGrowthYoY != null && r.revenueGrowthYoY < minRevGrowth) return false;
+            return true;
+          });
+        
+        return new Response(JSON.stringify({count: filtered.length, results: filtered}), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      } catch (err) {
+        return new Response(JSON.stringify({error:(err as Error).message}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      }
+    }
+
     // 2.7. API: Market Summary (Top Bar)
     if (path === '/api/market-summary') {
       try {
