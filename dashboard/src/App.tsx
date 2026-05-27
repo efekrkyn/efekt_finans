@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, ArrowUpRight, ArrowDownRight, Activity, DollarSign, TrendingUp, Download, Check, AlertCircle, Info, PieChart, Briefcase, ChevronDown, 
-  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2 } from 'lucide-react';
+  ChevronRight, BarChart, Bell, BellRing, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2 } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
@@ -283,6 +283,17 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (data) {
+      setSentimentLoading(true);
+      setSentimentData(null);
+      fetch(`/api/sentiment?ticker=${data.ticker}`, { headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` } })
+        .then(r => r.json())
+        .then(d => { setSentimentData(d); setSentimentLoading(false); })
+        .catch(() => setSentimentLoading(false));
+    }
+  }, [data]);
+
+  useEffect(() => {
     if (activeTab === 'charts' && data) {
       fetch(`/api/price-history?ticker=${data.ticker}&range=${priceRange}`)
         .then(r => r.json())
@@ -307,6 +318,44 @@ export default function App() {
 
   const [globalKapNews, setGlobalKapNews] = useState('');
   const [globalKapLoading, setGlobalKapLoading] = useState(false);
+  
+  const [sentimentData, setSentimentData] = useState<{score: number, summary: string} | null>(null);
+  const [sentimentLoading, setSentimentLoading] = useState(false);
+
+  const [peerCompareData, setPeerCompareData] = useState('');
+  const [peerCompareLoading, setPeerCompareLoading] = useState(false);
+
+  const runPeerCompare = async () => {
+    if (!data) return;
+    setPeerCompareLoading(true);
+    setPeerCompareData('');
+    try {
+      const res = await fetch(`/api/peer-compare?ticker=${data.ticker}`, {
+        headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
+      });
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let chunk = await reader.read();
+        while (!chunk.done) {
+          const lines = decoder.decode(chunk.value).split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const str = line.slice(6);
+              if (str === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(str);
+                if (parsed.chunk) setPeerCompareData(prev => prev + parsed.chunk);
+              } catch (e) {}
+            }
+          }
+          chunk = await reader.read();
+        }
+      }
+    } catch (e) {} finally {
+      setPeerCompareLoading(false);
+    }
+  };
 
   const [backtestTicker, setBacktestTicker] = useState('THYAO');
   const [backtestYears, setBacktestYears] = useState(3);
@@ -372,6 +421,44 @@ export default function App() {
     }
   };
 
+  const [dividendData, setDividendData] = useState('');
+  const [dividendLoading, setDividendLoading] = useState(false);
+  const [monthlyAddition, setMonthlyAddition] = useState(5000);
+
+  const runDividendPlanner = async () => {
+    if (portfolio.length === 0) return;
+    setDividendLoading(true);
+    setDividendData('');
+    try {
+      const res = await fetch('/api/dividend-planner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        body: JSON.stringify({ portfolio, monthlyAddition })
+      });
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let chunk = await reader.read();
+        while (!chunk.done) {
+          const lines = decoder.decode(chunk.value).split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const str = line.slice(6);
+              if (str === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(str);
+                if (parsed.chunk) setDividendData(prev => prev + parsed.chunk);
+              } catch (e) {}
+            }
+          }
+          chunk = await reader.read();
+        }
+      }
+    } catch (e) {} finally {
+      setDividendLoading(false);
+    }
+  };
+
   useEffect(() => {
     safeLocalStorage.setItem('dexter-portfolio', JSON.stringify(portfolio));
   }, [portfolio]);
@@ -394,6 +481,66 @@ export default function App() {
   });
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
   const [triggeredAlerts, setTriggeredAlerts] = useState<Alert[]>([]);
+  
+  const [macroData, setMacroData] = useState('');
+  const [macroLoading, setMacroLoading] = useState(false);
+  const runMacroAnalysis = async () => {
+    setMacroLoading(true);
+    setMacroData('');
+    try {
+      const res = await fetch('/api/macro-analysis', {
+        headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
+      });
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let chunk = await reader.read();
+        while (!chunk.done) {
+          const lines = decoder.decode(chunk.value).split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const str = line.slice(6);
+              if (str === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(str);
+                if (parsed.chunk) setMacroData(prev => prev + parsed.chunk);
+              } catch (e) {}
+            }
+          }
+          chunk = await reader.read();
+        }
+      }
+    } catch (e) {} finally {
+      setMacroLoading(false);
+    }
+  };
+
+  const [smartAlertInput, setSmartAlertInput] = useState('');
+  const [smartAlertLoading, setSmartAlertLoading] = useState(false);
+
+  const createSmartAlert = async () => {
+    if (!smartAlertInput.trim()) return;
+    setSmartAlertLoading(true);
+    try {
+      const res = await fetch('/api/alerts/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        body: JSON.stringify({ query: smartAlertInput })
+      });
+      const data = await res.json();
+      if (data && data.ticker && data.price && data.condition) {
+        setAlerts(p => [...p, { id: crypto.randomUUID(), ticker: data.ticker, condition: data.condition, price: Number(data.price), createdAt: new Date().toISOString() }]);
+        setSmartAlertInput('');
+        alert(`Akıllı Alarm Başarıyla Kuruldu: ${data.ticker} ${data.condition === 'above' ? '≥' : '≤'} ${data.price} ₺`);
+      } else {
+        alert('Alarm algılanamadı, lütfen daha net yazın (Örn: THYAO 300 üzerine çıkarsa uyar)');
+      }
+    } catch (e) {
+      alert('Yapay zeka alarmı parse edemedi.');
+    } finally {
+      setSmartAlertLoading(false);
+    }
+  };
 
   useEffect(() => { safeLocalStorage.setItem('dexter-alerts', JSON.stringify(alerts)); }, [alerts]);
 
@@ -888,10 +1035,12 @@ export default function App() {
             { id: 'watchlist', label: 'İzleme Listesi', icon: List, active: activeTab === 'watchlist' },
             { id: 'portfolio', label: 'Portföyüm', icon: Briefcase, active: activeTab === 'portfolio' },
             { id: 'backtest', label: 'Backtest', icon: Activity, active: activeTab === 'backtest' },
+            { id: 'alerts', label: 'Akıllı Alarmlar', icon: BellRing, active: activeTab === 'alerts' },
             { id: 'kap', label: 'KAP Canlı', icon: Bell, active: activeTab === 'kap' },
             { id: 'agenda', label: 'Ajanda', icon: Calendar, active: activeTab === 'agenda' },
             { id: 'screener', label: 'Tarayıcı', icon: Search, active: activeTab === 'screener' },
             { id: 'global', label: 'Global', icon: TrendingUp, active: activeTab === 'global' },
+            { id: 'macro', label: 'Makro Analiz', icon: BrainCircuit, active: activeTab === 'macro' },
             { id: 'heatmap', label: 'Heatmap', icon: LayoutGrid, active: activeTab === 'heatmap' },
             { id: 'assistant', label: 'AI Asistan', icon: MessageSquare, active: activeTab === 'assistant' }
           ].map(item => (
@@ -1244,10 +1393,94 @@ export default function App() {
                       <div>{parseMarkdown(portfolioAnalysis)}</div>
                     </div>
                   )}
+
+                  <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid var(--glass-border)' }}>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Briefcase size={24} color="var(--accent-primary)" /> AI Temettü Emeklilik Planlayıcısı
+                    </h3>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>Portföyünüzdeki hisseleri ve geçmiş temettü verimlerini baz alarak yapay zeka sizin için 5, 10 ve 20 yıllık bir emeklilik ve pasif gelir simülasyonu oluştursun.</p>
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Aylık Düzenli Eklenecek Tutar (TL)</label>
+                        <input type="number" value={monthlyAddition} onChange={(e) => setMonthlyAddition(Number(e.target.value))} style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1.1rem', width: '200px' }} />
+                      </div>
+                      <button 
+                        onClick={runDividendPlanner}
+                        disabled={dividendLoading}
+                        style={{ padding: '12px 24px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: dividendLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                        {dividendLoading ? <Loader2 className="spinner" size={20} /> : <Sparkles size={20} />}
+                        {dividendLoading ? 'Plan Hesaplanıyor...' : 'Emeklilik Projeksiyonu Çıkar'}
+                      </button>
+                    </div>
+
+                    {dividendData && (
+                      <div className="animated-fade-in" style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '32px', lineHeight: '1.6' }}>
+                        {parseMarkdown(dividendData)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           )}
+          {activeTab === 'alerts' && (
+            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
+                <BellRing size={32} color="var(--accent-primary)" /> Akıllı Alarmlar
+              </h2>
+              
+              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '16px' }}>Doğal Dille Alarm Kur</h3>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.95rem' }}>
+                  Yapay zeka asistanınıza ne istediğinizi yazın, o sizin için alarmı kursun. Örnek: <br/>
+                  <span style={{ fontStyle: 'italic', color: 'var(--accent-primary)' }}>"Türk Hava Yolları 350'yi geçerse bana haber ver"</span> veya <br/>
+                  <span style={{ fontStyle: 'italic', color: 'var(--accent-primary)' }}>"SAHOL 95 liranın altına düşerse uyar"</span>
+                </p>
+                
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <input 
+                    value={smartAlertInput} 
+                    onChange={(e) => setSmartAlertInput(e.target.value)} 
+                    placeholder="Alarm koşulunuzu yazın..." 
+                    style={{ flex: 1, padding: '16px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1rem' }} 
+                    onKeyDown={(e) => e.key === 'Enter' && createSmartAlert()}
+                  />
+                  <button 
+                    onClick={createSmartAlert} 
+                    disabled={smartAlertLoading}
+                    style={{ padding: '0 32px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: smartAlertLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    {smartAlertLoading ? <Loader2 className="spinner" size={20} /> : <Sparkles size={20} />}
+                    {smartAlertLoading ? 'Kuruluyor...' : 'Alarm Kur'}
+                  </button>
+                </div>
+              </div>
+
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '16px' }}>Aktif Alarmlarınız ({alerts.length})</h3>
+              {alerts.length === 0 ? (
+                <div style={{ padding: '32px', textAlign: 'center', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>
+                  Henüz bir alarm kurmadınız.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                  {alerts.map(a => (
+                    <div key={a.id} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', padding: '20px', borderRadius: '12px', position: 'relative' }}>
+                      <button onClick={() => setAlerts(p => p.filter(x => x.id !== a.id))} style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+                      <h4 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '8px' }}>{a.ticker}</h4>
+                      <div style={{ fontSize: '1.1rem' }}>
+                        {a.condition === 'above' ? '≥' : '≤'} <strong>{a.price} ₺</strong> olduğunda bildir
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '12px' }}>
+                        {new Date(a.createdAt).toLocaleString('tr-TR')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
           {activeTab === 'backtest' && (
             <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
               <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
@@ -1391,6 +1624,40 @@ export default function App() {
           )}
 
           {/* AI ASSISTANT VIEW */}
+          {activeTab === 'macro' && (
+            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+                <h2 style={{ fontSize: '2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <BrainCircuit size={32} color="var(--accent-primary)" /> Makroekonomi & Merkez Bankası (AI Analizi)
+                </h2>
+                <button 
+                  onClick={runMacroAnalysis}
+                  disabled={macroLoading}
+                  style={{ padding: '12px 24px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: macroLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'opacity 0.2s' }}
+                >
+                  {macroLoading ? <Loader2 className="spinner" size={20} /> : <Sparkles size={20} />}
+                  {macroLoading ? 'Rapor Hazırlanıyor...' : 'Güncel Rapor Üret'}
+                </button>
+              </div>
+
+              {!macroData && !macroLoading && (
+                <div style={{ textAlign: 'center', padding: '64px', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--glass-border)' }}>
+                  <TrendingUp size={48} color="var(--text-muted)" style={{ marginBottom: '16px', opacity: 0.5 }} />
+                  <h3 style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>Derinlemesine Makroekonomik Analiz</h3>
+                  <p style={{ color: 'var(--text-muted)', marginTop: '8px', maxWidth: 600, margin: '8px auto 0' }}>
+                    Yapay Zeka (DeepSeek V4 Pro) internetteki son dakika verilerini (Enflasyon, TCMB faiz kararları, dolar beklentileri) tarayarak Borsa İstanbul'a olası etkilerini sizin için saniyeler içinde analiz eder.
+                  </p>
+                </div>
+              )}
+
+              {macroData && (
+                <div className="animated-fade-in" style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '40px', borderRadius: '16px', border: '1px solid var(--glass-border)', lineHeight: '1.7', fontSize: '1.05rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+                  {parseMarkdown(macroData)}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'global' && (
             <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
               <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:24}}>Global Varlıklar</h2>
@@ -1702,7 +1969,24 @@ export default function App() {
                   </button>
                 </div>
                 <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '8px' }}>{data.companyName}</h1>
-                <div style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '24px' }}>{data.ticker} - BIST</div>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>{data.ticker} - BIST</div>
+                  {sentimentLoading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      <Loader2 className="spinner" size={14} /> Duyarlılık Analizi Yapılıyor...
+                    </div>
+                  ) : sentimentData ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 16px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '24px', border: '1px solid var(--glass-border)' }} title={sentimentData.summary}>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>SOSYAL DUYARLILIK:</div>
+                      <div style={{ width: '100px', height: '8px', backgroundColor: 'var(--bg-main)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${sentimentData.score}%`, backgroundColor: sentimentData.score > 60 ? 'var(--accent-primary)' : sentimentData.score < 40 ? 'var(--accent-negative)' : 'var(--text-muted)', transition: 'width 1s ease-in-out' }} />
+                      </div>
+                      <div style={{ fontWeight: 800, color: sentimentData.score > 60 ? 'var(--accent-primary)' : sentimentData.score < 40 ? 'var(--accent-negative)' : 'var(--text-muted)' }}>
+                        {sentimentData.score}/100
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px', marginBottom: '24px' }}>
                   <div>
@@ -1965,6 +2249,29 @@ export default function App() {
                         <div style={{ marginBottom: '8px' }}><span style={{ color: 'var(--text-muted)' }}>F/K:</span> {stock.trailingPE?.toFixed(2) || '-'}</div>
                       </div>
                     ))}
+                  </div>
+
+                  <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid var(--glass-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                      <BrainCircuit size={28} color="var(--accent-primary)" />
+                      <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Akıllı Sektör & Rakip Kıyaslaması</h3>
+                    </div>
+                    
+                    {!peerCompareData && !peerCompareLoading ? (
+                       <button onClick={runPeerCompare} style={{ padding: '16px 32px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'opacity 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'} onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
+                         <Sparkles size={20} /> Yapay Zeka Kıyaslama Raporu Oluştur (DeepSeek V4 Pro)
+                       </button>
+                    ) : (
+                       <div className="animated-fade-in" style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '32px', borderRadius: '12px', border: '1px solid var(--glass-border)', lineHeight: '1.6' }}>
+                          {peerCompareLoading && !peerCompareData ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-primary)' }}>
+                              <Loader2 className="spinner" size={24} /> <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Yapay Zeka Sektörel Verileri Analiz Ediyor...</span>
+                            </div>
+                          ) : (
+                            <div>{parseMarkdown(peerCompareData)}</div>
+                          )}
+                       </div>
+                    )}
                   </div>
                 </section>
               )}

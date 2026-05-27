@@ -854,6 +854,191 @@ Raporunu Markdown formatında şu başlıklarla hazırla:
       });
     }
 
+    if (path === '/api/sentiment') {
+      const ticker = url.searchParams.get('ticker');
+      if (!ticker) {
+        return new Response(JSON.stringify({ error: 'Ticker required' }), { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      
+      try {
+        const query = `Borsa İstanbul ${ticker} hissesi güncel haberler sosyal medya analiz yorumları`;
+        log('info', 'tavily_search_sentiment', { query });
+        const searchResults = await searchTavily(query);
+        
+        const prompt = `Sen finansal bir duyarlılık analizi yapan yapay zekasın. Yalnızca JSON formatında yanıt verirsin. Aşağıda ${ticker} hissesiyle ilgili internetten toplanan son güncel haberler ve yorumlar yer almaktadır:\n\n${searchResults}\n\nYukarıdaki metni analiz et ve yatırımcıların bu hisse hakkındaki genel hissiyatını bul. JSON formatında şu anahtarları içeren bir yanıt döndür:\n- score (0 ile 100 arası bir sayı. 0 tam panik/negatif, 100 tam coşku/pozitif, 50 nötr)\n- summary (Bu skorun nedenini açıklayan 2-3 cümlelik çok net bir özet.)\n\nSADECE JSON YANITI VER, BAŞKA METİN YAZMA. Örn: {"score": 75, "summary": "Şirketin aldığı yeni ihaleler yatırımcılar arasında pozitif karşılandı."}`;
+        
+        const responseText = await callLlm(prompt, { model: 'deepseek-chat', temperature: 0.1 });
+        
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+        
+        return new Response(jsonStr, { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    if (path === '/api/dividend-planner' && req.method === 'POST') {
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            const body = await req.json() as { portfolio: any[], monthlyAddition: number };
+            const portfolio = body.portfolio || [];
+            
+            const prompt = `Aşağıda kullanıcının Borsa İstanbul hisse portföyü ve aylık ekleyebileceği tasarruf miktarı yer almaktadır:
+Portföy: ${JSON.stringify(portfolio, null, 2)}
+Aylık Eklenecek Tutar: ${body.monthlyAddition} TL
+
+Sen uzman bir Temettü Emekliliği Planlayıcısısın (AI Dividend Planner). BIST şirketlerinin geçmiş temettü verimlerini ve büyüme potansiyellerini hesaba katarak, bu yatırımcı için 5, 10 ve 20 yıllık bir temettü projeksiyonu çiz. 
+Raporu Markdown formatında hazırla. Özellikle şunlara değin:
+1. Portföydeki hisselerin temettü potansiyelleri (Temettü şampiyonları var mı?)
+2. Aylık eklemelerle birlikte bileşik getirinin (kartopu etkisinin) gücü.
+3. 5, 10 ve 20 yıl sonra tahmini ulaşılacak pasif aylık temettü geliri.
+4. Çeşitlendirme tavsiyeleri (Sadece eregl, froto vb. mi var?).`;
+            
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir BIST Temettü Emeklilik analistisin.'),
+              new HumanMessage(prompt)
+            ], { model: 'deepseek-v4-pro' });
+
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          } catch (err) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
+            controller.close();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    if (path === '/api/macro-analysis') {
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            const query = `Türkiye makroekonomi güncel enflasyon TCMB faiz kararı dolar kuru beklentileri borsa istanbul etkisi`;
+            log('info', 'tavily_search', { query });
+            const searchResults = await searchTavily(query);
+            
+            const prompt = `Aşağıda Türkiye ekonomisi ve TCMB faiz kararlarıyla ilgili güncel haber ve veriler var:\n\n${searchResults}\n\nSen uzman bir makroekonomist ve fon yöneticisisin. "Makroekonomi & Merkez Bankası Raporu" başlığı altında, güncel enflasyon, faiz oranları ve döviz kuru durumunu analiz et. Borsa İstanbul'daki farklı sektörlere (Bankacılık, Sanayi, İhracatçılar vb.) olası etkilerini maddeler halinde açıkla. Raporu okunaklı bir Markdown formatında yaz.`;
+            
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir makroekonomistsin.'),
+              new HumanMessage(prompt)
+            ], { model: 'deepseek-v4-pro' });
+
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          } catch (err) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
+            controller.close();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    if (path === '/api/alerts/parse' && req.method === 'POST') {
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      try {
+        const body = await req.json() as { query: string };
+        if (!body.query) throw new Error('Query required');
+        
+        const prompt = `Kullanıcının yazdığı doğal dildeki borsa alarm cümlesini analiz et. SADECE JSON formatında yanıt ver. 
+Format: {"ticker": "HİSSE KODU (örn: THYAO)", "condition": "above" VEYA "below", "price": SAYISAL_FIYAT}
+Eğer kullanıcı hisse adını yazmışsa, BIST koduna çevir (örn: Türk Hava Yolları -> THYAO). Fiyat virgüllüyse noktaya çevir.
+Kullanıcı metni: "${body.query}"`;
+
+        const responseText = await callLlm(prompt, { model: 'deepseek-chat', temperature: 0 });
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+        return new Response(jsonStr, { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    if (path === '/api/peer-compare') {
+      const ticker = url.searchParams.get('ticker');
+      if (!ticker) {
+        return new Response(JSON.stringify({ error: 'Ticker required' }), { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            const query = `Borsa İstanbul ${ticker} şirketi sektörü ve en büyük 3 rakibi, güncel kıyaslamaları ve pazar payı`;
+            log('info', 'tavily_search', { query });
+            const searchResults = await searchTavily(query);
+            
+            const prompt = `Aşağıda ${ticker} şirketi ve rakipleriyle ilgili arama sonuçları var:\n\n${searchResults}\n\nSen bir BİST analistisin. ${ticker} hissesi için "Akıllı Sektör & Rakip Kıyaslaması" raporu hazırla. Önce şirketin sektördeki en büyük 3 rakibini belirle, sonra büyüme, kârlılık, pazar payı ve beklentiler açısından kıyasla. Raporu Markdown formatında ve karşılaştırmalı maddeler halinde akıcı bir şekilde yaz.`;
+            
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir BIST finansal analistisin.'),
+              new HumanMessage(prompt)
+            ], { model: 'deepseek-v4-pro' });
+
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          } catch (err) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
+            controller.close();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
     if (path === '/api/kap-news') {
       const authErr = requireApiKey();
       if (authErr) return authErr;
