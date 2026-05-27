@@ -3,6 +3,7 @@ import {
   Search, Activity, Loader2, Briefcase, TrendingUp,
   ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
+import { CandlestickChart } from './CandlestickChart';
 
 function ClickableCard({ onActivate, ariaLabel, children, ...rest }: any) {
   return (
@@ -110,6 +111,7 @@ export default function App() {
 
   const [priceHistory, setPriceHistory] = useState<{points: {date: string, close: number, volume: number}[]} | null>(null);
   const [priceRange, setPriceRange] = useState<'1m'|'3m'|'6m'|'1y'|'5y'>('1y');
+  const [chartType, setChartType] = useState<'line'|'candle'>('candle');
 
   useEffect(() => {
     if (activeTab === 'charts' && data) {
@@ -1297,6 +1299,22 @@ export default function App() {
                   <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
                       <h3 style={{fontSize:'1.2rem', fontWeight:700}}>{data.ticker} Fiyat Geçmişi</h3>
+                      <div style={{display:'flex', gap:8, marginRight:16}}>
+                        <button onClick={() => setChartType('candle')}
+                          style={{padding:'6px 14px', borderRadius:6, border:'none',
+                            backgroundColor: chartType === 'candle' ? 'var(--accent-primary)' : 'transparent',
+                            color: chartType === 'candle' ? '#000' : 'var(--text-muted)',
+                            cursor:'pointer', fontWeight:600}}>
+                          Mum
+                        </button>
+                        <button onClick={() => setChartType('line')}
+                          style={{padding:'6px 14px', borderRadius:6, border:'none',
+                            backgroundColor: chartType === 'line' ? 'var(--accent-primary)' : 'transparent',
+                            color: chartType === 'line' ? '#000' : 'var(--text-muted)',
+                            cursor:'pointer', fontWeight:600}}>
+                          Çizgi
+                        </button>
+                      </div>
                       <div style={{display:'flex', gap:8}}>
                         {(['1m','3m','6m','1y','5y'] as const).map(r => (
                           <button key={r} onClick={() => setPriceRange(r)}
@@ -1310,19 +1328,23 @@ export default function App() {
                       </div>
                     </div>
                     {priceHistory && priceHistory.points.length > 0 ? (
-                      <div style={{width:'100%', height:400}}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={priceHistory.points} margin={{top:20, right:30, left:20, bottom:5}}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                            <XAxis dataKey="date" stroke="#999" tickFormatter={(d) => new Date(d).toLocaleDateString('tr-TR', {month:'short', year:'2-digit'})} />
-                            <YAxis stroke="#999" domain={['auto','auto']} tickFormatter={(v) => (v as number).toFixed(0)} />
-                            <Tooltip contentStyle={{backgroundColor:'#1c1c1c', border:'1px solid #333'}}
-                              labelFormatter={(d) => new Date(d).toLocaleDateString('tr-TR')}
-                              formatter={(v: any) => [Number(v).toFixed(2) + ' ₺', 'Kapanış']} />
-                            <Line type="monotone" dataKey="close" stroke="var(--accent-primary)" strokeWidth={2} dot={false} name="Kapanış" />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                      chartType === 'candle' ? (
+                        <CandlestickChart data={priceHistory.points as any} />
+                      ) : (
+                        <div style={{width:'100%', height:400}}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={priceHistory.points} margin={{top:20, right:30, left:20, bottom:5}}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                              <XAxis dataKey="date" stroke="#999" tickFormatter={(d) => new Date(d).toLocaleDateString('tr-TR', {month:'short', year:'2-digit'})} />
+                              <YAxis stroke="#999" domain={['auto','auto']} tickFormatter={(v) => (v as number).toFixed(0)} />
+                              <Tooltip contentStyle={{backgroundColor:'#1c1c1c', border:'1px solid #333'}}
+                                labelFormatter={(d) => new Date(d).toLocaleDateString('tr-TR')}
+                                formatter={(v: any) => [Number(v).toFixed(2) + ' ₺', 'Kapanış']} />
+                              <Line type="monotone" dataKey="close" stroke="var(--accent-primary)" strokeWidth={2} dot={false} name="Kapanış" />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )
                     ) : (
                       <div style={{color:'var(--text-muted)', padding:60, textAlign:'center'}}>Fiyat verisi yükleniyor...</div>
                     )}

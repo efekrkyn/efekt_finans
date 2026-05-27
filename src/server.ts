@@ -145,8 +145,15 @@ const server = Bun.serve({
         const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
         const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
         const points = (history.quotes || [])
-          .filter((q: any) => typeof q.close === 'number')
-          .map((q: any) => ({ date: q.date, close: q.close, volume: q.volume }));
+          .filter((q: any) => typeof q.close === 'number' && typeof q.open === 'number')
+          .map((q: any) => ({
+            date: q.date,
+            open: q.open,
+            high: q.high,
+            low: q.low,
+            close: q.close,
+            volume: q.volume
+          }));
         return new Response(JSON.stringify({ ticker, range, points }), {
           headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}
         });
