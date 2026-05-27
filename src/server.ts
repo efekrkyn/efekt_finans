@@ -573,6 +573,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
               evToEbitda: d.evToEbitda,
               revenueGrowthYoY: d.scorecard?.revenueGrowthYoY,
               netIncomeGrowthYoY: d.scorecard?.netIncomeGrowthYoY,
+              ebitdaGrowthYoY: d.scorecard?.ebitdaGrowthYoY,
             };
           } catch { return null; }
         }));

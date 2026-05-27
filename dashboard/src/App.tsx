@@ -490,6 +490,35 @@ export default function App() {
   };
 
 
+  const calculateBalanceScore = (d: any): {score:number, breakdown:{label:string, points:number, max:number, note:string}[]} | null => {
+    if (!d) return null;
+    const sc = d.scorecard;
+    const breakdown: {label:string, points:number, max:number, note:string}[] = [];
+
+    const revG = sc?.revenueGrowthYoY ?? 0;
+    const revPts = revG >= 50 ? 2 : revG >= 20 ? 1.5 : revG >= 0 ? 1 : revG >= -10 ? 0.5 : 0;
+    breakdown.push({label:'Satış Büyümesi YoY', points:revPts, max:2, note:`%${revG.toFixed(1)}`});
+
+    const netG = sc?.netIncomeGrowthYoY ?? 0;
+    const netPts = netG >= 50 ? 2 : netG >= 20 ? 1.5 : netG >= 0 ? 1 : netG >= -20 ? 0.5 : 0;
+    breakdown.push({label:'Net Kâr Büyümesi YoY', points:netPts, max:2, note:`%${netG.toFixed(1)}`});
+
+    const ebitdaG = sc?.ebitdaGrowthYoY ?? 0;
+    const ebitdaPts = ebitdaG >= 30 ? 2 : ebitdaG >= 10 ? 1.5 : ebitdaG >= 0 ? 1 : ebitdaG >= -10 ? 0.5 : 0;
+    breakdown.push({label:'FAVÖK Büyümesi YoY', points:ebitdaPts, max:2, note:`%${ebitdaG.toFixed(1)}`});
+
+    const pe = d.trailingPE;
+    const pePts = pe == null ? 0.5 : pe > 0 && pe < 5 ? 2 : pe < 10 ? 1.5 : pe < 20 ? 1 : pe < 30 ? 0.5 : 0;
+    breakdown.push({label:'F/K Çarpanı', points:pePts, max:2, note: pe ? pe.toFixed(2) : 'Veri yok'});
+
+    const pb = d.priceToBook;
+    const pbPts = pb == null ? 0.5 : pb > 0 && pb < 1 ? 2 : pb < 2 ? 1.5 : pb < 3 ? 1 : pb < 5 ? 0.5 : 0;
+    breakdown.push({label:'PD/DD Çarpanı', points:pbPts, max:2, note: pb ? pb.toFixed(2) : 'Veri yok'});
+
+    const score = breakdown.reduce((s,b) => s + b.points, 0);
+    return { score, breakdown };
+  };
+
   const formatMoney = (val: any) => {
     if (val == null) return '-';
     const n = Number(val);
@@ -962,7 +991,7 @@ export default function App() {
                   <table style={{width:'100%', borderCollapse:'collapse'}}>
                     <thead>
                       <tr style={{color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'left', borderBottom:'1px solid var(--glass-border)'}}>
-                        <th style={{padding:'14px 16px'}}>Sembol</th><th>Şirket</th><th>Fiyat</th><th>F/K</th><th>PD/DD</th><th>FD/FAVÖK</th><th>Satış YoY</th><th>Net Kâr YoY</th>
+                        <th style={{padding:'14px 16px'}}>Sembol</th><th>Şirket</th><th>Puan</th><th>Fiyat</th><th>F/K</th><th>PD/DD</th><th>FD/FAVÖK</th><th>Satış YoY</th><th>Net Kâr YoY</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -973,6 +1002,17 @@ export default function App() {
                           onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                           <td style={{padding:'14px 16px', fontWeight:700, color:'var(--accent-primary)'}}>{r.ticker}</td>
                           <td style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>{r.companyName}</td>
+                          <td>
+                            {(() => {
+                              const sc = calculateBalanceScore({
+                                trailingPE: r.trailingPE, priceToBook: r.priceToBook,
+                                scorecard: { revenueGrowthYoY: r.revenueGrowthYoY, netIncomeGrowthYoY: r.netIncomeGrowthYoY, ebitdaGrowthYoY: r.ebitdaGrowthYoY }
+                              });
+                              if (!sc) return '-';
+                              const c = sc.score >= 7 ? 'var(--accent-primary)' : sc.score >= 4 ? '#f59e0b' : 'var(--accent-negative)';
+                              return <span style={{backgroundColor: c, color: '#000', padding: '2px 8px', borderRadius: '12px', fontWeight: 700, fontSize: '0.85rem'}}>{sc.score.toFixed(1)}</span>;
+                            })()}
+                          </td>
                           <td>{r.currentPrice?.toFixed(2)} ₺</td>
                           <td>{r.trailingPE?.toFixed(2) ?? '-'}</td>
                           <td>{r.priceToBook?.toFixed(2) ?? '-'}</td>
@@ -1147,7 +1187,38 @@ export default function App() {
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{data.evToEbitda ? data.evToEbitda.toFixed(2) : '-'}</div>
                   </div>
                 </div>
-
+                {/* Bilanço Puanı */}
+                {(() => {
+                  const sc = calculateBalanceScore(data);
+                  if (!sc) return null;
+                  const color = sc.score >= 7 ? 'var(--accent-primary)' : sc.score >= 4 ? '#f59e0b' : 'var(--accent-negative)';
+                  return (
+                    <div style={{marginTop:24, marginBottom:24, padding:20, backgroundColor:'rgba(255,255,255,0.02)', borderRadius:12, border:`1px solid ${color}`}}>
+                      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16}}>
+                        <h4 style={{fontSize:'1.05rem', fontWeight:800, color:'var(--text-muted)', margin:0}}>Bilanço Puanı</h4>
+                        <div style={{display:'flex', alignItems:'baseline', gap:4}}>
+                          <span style={{fontSize:'2.5rem', fontWeight:900, color}}>{sc.score.toFixed(1)}</span>
+                          <span style={{fontSize:'1.2rem', color:'var(--text-muted)'}}>/ 10</span>
+                        </div>
+                      </div>
+                      <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8}}>
+                        {sc.breakdown.map((b,i) => {
+                          const pct = (b.points / b.max) * 100;
+                          const segColor = pct >= 75 ? 'var(--accent-primary)' : pct >= 50 ? '#f59e0b' : 'var(--accent-negative)';
+                          return (
+                            <div key={i} title={`${b.label}: ${b.note}`}>
+                              <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginBottom:4, textAlign:'center', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{b.label}</div>
+                              <div style={{height:6, backgroundColor:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden'}}>
+                                <div style={{width:`${pct}%`, height:'100%', backgroundColor:segColor}} />
+                              </div>
+                              <div style={{fontSize:'0.75rem', textAlign:'center', marginTop:4, fontWeight:600, color:segColor}}>{b.points}/{b.max}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
                   <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '8px', flex: 1 }}>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Satış Büyümesi (Yıllık)</div>
