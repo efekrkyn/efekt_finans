@@ -394,12 +394,55 @@ export default function App() {
     const ctrl = new AbortController();
     aiAbortRef.current = ctrl;
     setAiLoading(true);
+    setAiAnalysis(null);
+    setAiSentiment(null);
+    setError(null);
+    
     try {
       const res = await fetch(`/api/ai-analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'AI hatası');
-      setAiAnalysis(json.analysis);
-      setAiSentiment(json.sentiment || null);
+      if (!res.ok) throw new Error('AI hatası');
+      if (!res.body) throw new Error('Response body yok');
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6).trim();
+            if (dataStr === '[DONE]') break;
+            if (!dataStr) continue;
+            
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.error) throw new Error(parsed.error);
+              if (parsed.analysisChunk) {
+                fullText += parsed.analysisChunk;
+                setAiAnalysis(fullText);
+              }
+            } catch (err) {
+              // Ignore JSON parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+      
+      // Sentiment ayıklama
+      const sentimentMatch = fullText.match(/\[SENTIMENT\]:\s*positive:\s*(\d+),\s*neutral:\s*(\d+),\s*negative:\s*(\d+)/i);
+      if (sentimentMatch) {
+        setAiSentiment({
+          positive: parseInt(sentimentMatch[1], 10),
+          neutral: parseInt(sentimentMatch[2], 10),
+          negative: parseInt(sentimentMatch[3], 10)
+        });
+      }
     } catch(e: any) { 
       if (e.name !== 'AbortError') {
         console.error(e);
