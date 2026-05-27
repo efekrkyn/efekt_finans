@@ -388,6 +388,8 @@ export default function App() {
     }
   };
 
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const aiAbortRef = useRef<AbortController | null>(null);
   const fetchAiAnalysis = useCallback(async (ticker: string) => {
     aiAbortRef.current?.abort();
@@ -396,7 +398,7 @@ export default function App() {
     setAiLoading(true);
     setAiAnalysis(null);
     setAiSentiment(null);
-    setError(null);
+    setAiError(null);
     
     try {
       const res = await fetch(`/api/ai-analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
@@ -426,7 +428,12 @@ export default function App() {
             } catch (err) {
               continue;
             }
-            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.error) {
+               if (parsed.error.includes('Too Many Requests') || parsed.error.includes('Quota')) {
+                 throw new Error('Google Gemini API kotanız dolmuş. Lütfen 1 dakika bekleyip tekrar deneyin.');
+               }
+               throw new Error(parsed.error);
+            }
             if (parsed.analysisChunk) {
               fullText += parsed.analysisChunk;
               setAiAnalysis(fullText);
@@ -447,7 +454,7 @@ export default function App() {
     } catch(e: any) { 
       if (e.name !== 'AbortError') {
         console.error(e);
-        setError('AI analizi alınamadı');
+        setAiError(e.message || 'AI analizi alınamadı');
       }
     } finally { 
       if (aiAbortRef.current === ctrl) setAiLoading(false); 
@@ -1609,6 +1616,10 @@ export default function App() {
                   {aiLoading ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-primary)' }}>
                       <Loader2 className="spinner" size={24} /> Yapay Zeka analiz ediyor...
+                    </div>
+                  ) : aiError ? (
+                    <div style={{ color: 'var(--accent-negative)', padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--accent-negative)' }}>
+                      <strong>AI Analiz Hatası:</strong> {aiError}
                     </div>
                   ) : (
                     <div>
