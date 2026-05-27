@@ -64,6 +64,7 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
   let quote;
   try {
     quote = await yahooFinance.quote(formattedTicker);
+    if (!quote) throw new Error('Sonuç bulunamadı');
   } catch (err) {
     throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): ${(err as Error).message}`);
   }

@@ -420,15 +420,16 @@ export default function App() {
             if (dataStr === '[DONE]') break;
             if (!dataStr) continue;
             
+            let parsed;
             try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.error) throw new Error(parsed.error);
-              if (parsed.analysisChunk) {
-                fullText += parsed.analysisChunk;
-                setAiAnalysis(fullText);
-              }
+              parsed = JSON.parse(dataStr);
             } catch (err) {
-              // Ignore JSON parse errors for incomplete chunks
+              continue;
+            }
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.analysisChunk) {
+              fullText += parsed.analysisChunk;
+              setAiAnalysis(fullText);
             }
           }
         }
@@ -454,10 +455,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'ai' && data && !aiAnalysis && !aiLoading) {
+    if (activeTab === 'ai' && data && !aiAnalysis && !aiLoading && !error) {
       fetchAiAnalysis(data.ticker);
     }
-  }, [activeTab, data, aiAnalysis, aiLoading, fetchAiAnalysis]);
+  }, [activeTab, data, aiAnalysis, aiLoading, error, fetchAiAnalysis]);
 
   const fundAbortRef = useRef<AbortController | null>(null);
   const generateAiFund = async () => {
