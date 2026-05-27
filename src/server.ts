@@ -210,10 +210,33 @@ const server = Bun.serve({
           },
         });
       }
+      const isForeign = ticker.includes('=X') || ticker.includes('-USD') || (ticker.length <= 5 && !ticker.includes('.') && /^[A-Z]+$/.test(ticker) && !['THYAO','TUPRS','KCHOL','AKBNK','ASELS','BIMAS','EREGL','ISCTR','SAHOL','YKBNK','GARAN','SISE','FROTO','PGSUS','TOASO','TCELL','SASA','HEKTS','TTKOM','ALARK','MGROS','DOAS','KRDMD','KOZAL','PETKM','ENJSA','ASTOR','EKGYO','TTRAK','VAKBN','GUBRF','OYAKC','KORDS','SOKM','VESBE','ARCLK','ODAS','KMPUR','HALKB','ENKAI'].includes(ticker));
+      
       try {
         if (!rateLimit(req, 20, 60000)) return new Response('Rate limited', {status:429, headers:{'Access-Control-Allow-Origin':'*'}});
         const cached = cacheGet(`analysis:${ticker}`);
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+        
+        if (isForeign) {
+          const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+          const quote: any = await yf.quote(ticker);
+          const data = {
+            ticker,
+            companyName: quote.longName || quote.shortName || ticker,
+            currentPrice: quote.regularMarketPrice,
+            marketCap: quote.marketCap || null,
+            currency: quote.currency || 'USD',
+            change: quote.regularMarketChangePercent || 0,
+            dayHigh: quote.regularMarketDayHigh,
+            dayLow: quote.regularMarketDayLow,
+            fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
+            fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+            volume: quote.regularMarketVolume,
+            assetType: ticker.includes('=X') ? 'FX' : ticker.includes('-USD') ? 'CRYPTO' : 'EQUITY'
+          };
+          cacheSet(`analysis:${ticker}`, data, 1000 * 60 * 5);
+          return new Response(JSON.stringify(data), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+        }
         const startTime = Date.now();
         log('info', 'analysis', { ticker });
         const data = await fetchBISTData(ticker);
@@ -234,6 +257,32 @@ const server = Bun.serve({
             'Access-Control-Allow-Origin': '*',
           },
         });
+      }
+    }
+
+    // 1.2. API: Yabancı varlık (ABD hisse, döviz, kripto)
+    if (path === '/api/asset') {
+      const symbol = url.searchParams.get('symbol');
+      if (!symbol) return new Response(JSON.stringify({error:'symbol zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      try {
+        const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+        const quote: any = await yf.quote(symbol);
+        return new Response(JSON.stringify({
+          ticker: symbol,
+          companyName: quote.longName || quote.shortName || symbol,
+          currentPrice: quote.regularMarketPrice,
+          marketCap: quote.marketCap || null,
+          currency: quote.currency || 'USD',
+          change: quote.regularMarketChangePercent || 0,
+          dayHigh: quote.regularMarketDayHigh,
+          dayLow: quote.regularMarketDayLow,
+          fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
+          fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+          volume: quote.regularMarketVolume,
+          assetType: symbol.includes('=X') ? 'FX' : symbol.includes('-USD') ? 'CRYPTO' : 'EQUITY'
+        }), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      } catch (err) {
+        return new Response(JSON.stringify({error:(err as Error).message}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       }
     }
 
@@ -400,21 +449,23 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
           newsCount: 0,
         });
 
-        // Filter BIST tickers (ending with .IS or of exchange IST)
-        const bistResults = (searchResults.quotes || [])
-          .filter((q: any) => typeof q?.symbol === 'string' && (q.symbol.endsWith('.IS') || q.exchange === 'IST'))
+        const allResults = (searchResults.quotes || [])
+          .filter((q: any) => typeof q?.symbol === 'string')
           .map((q: any) => {
             const symbol: string = q.symbol;
+            const isBist = symbol.endsWith('.IS') || q.exchange === 'IST';
+            const market = isBist ? 'BIST' : symbol.includes('=X') ? 'FX' : symbol.includes('-USD') ? 'CRYPTO' : 'US';
             return {
-              ticker: symbol.split('.')[0],
+              ticker: isBist ? symbol.split('.')[0] : symbol,
               symbol,
               name: q.shortname || q.longname || symbol,
               exchange: q.exchange,
+              market
             };
           });
 
-        cacheSet(`search:${query}`, bistResults, 1000 * 60 * 10); // 10 mins
-        return new Response(JSON.stringify(bistResults), {
+        cacheSet(`search:${query}`, allResults, 1000 * 60 * 10); // 10 mins
+        return new Response(JSON.stringify(allResults), {
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',

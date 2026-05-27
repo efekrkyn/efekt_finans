@@ -74,7 +74,7 @@ function getSessionId() {
 const sessionId = getSessionId();
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,6 +116,29 @@ export default function App() {
   const [screenerFilters, setScreenerFilters] = useState({minPE:'', maxPE:'', minPB:'', maxPB:'', minRevGrowth:''});
   const [screenerResults, setScreenerResults] = useState<any[]>([]);
   const [screenerLoading, setScreenerLoading] = useState(false);
+
+  type GlobalAsset = { ticker:string, companyName:string, currentPrice:number, change:number, currency:string, assetType:string };
+  const [globalAssets, setGlobalAssets] = useState<GlobalAsset[]>([]);
+  const [globalLoading, setGlobalLoading] = useState(false);
+
+  const GLOBAL_SYMBOLS = {
+    'ABD Hisseleri': ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA'],
+    'Döviz': ['TRY=X','EURTRY=X','GBPTRY=X','EURUSD=X'],
+    'Emtia': ['GC=F','SI=F','CL=F'],
+    'Kripto': ['BTC-USD','ETH-USD','SOL-USD']
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'global') return;
+    setGlobalLoading(true);
+    const allSymbols = Object.values(GLOBAL_SYMBOLS).flat();
+    Promise.all(allSymbols.map(s =>
+      fetch(`/api/asset?symbol=${encodeURIComponent(s)}`).then(r => r.json()).catch(() => null)
+    )).then(results => {
+      setGlobalAssets(results.filter(r => r && !r.error));
+      setGlobalLoading(false);
+    });
+  }, [activeTab]);
 
   const runScreener = async () => {
     setScreenerLoading(true);
@@ -608,6 +631,7 @@ export default function App() {
             { id: 'portfolio', label: 'Portföyüm', icon: Briefcase, active: activeTab === 'portfolio' },
             { id: 'agenda', label: 'Ajanda', icon: Calendar, active: activeTab === 'agenda' },
             { id: 'screener', label: 'Tarayıcı', icon: Search, active: activeTab === 'screener' },
+            { id: 'global', label: 'Global', icon: TrendingUp, active: activeTab === 'global' },
             { id: 'assistant', label: 'AI Asistan', icon: MessageSquare, active: activeTab === 'assistant' }
           ].map(item => (
             <ClickableCard 
@@ -619,6 +643,7 @@ export default function App() {
                 if (item.id === 'portfolio') { setActiveTab('portfolio'); }
                 if (item.id === 'agenda') { setActiveTab('agenda'); }
                 if (item.id === 'screener') { setData(null); setActiveTab('screener'); }
+                if (item.id === 'global') { setData(null); setActiveTab('global'); }
                 if (item.id === 'assistant') { setData(null); setActiveTab('assistant'); }
                 if (isMobile) setSidebarOpen(false);
               }}
@@ -949,6 +974,38 @@ export default function App() {
           )}
 
           {/* AI ASSISTANT VIEW */}
+          {activeTab === 'global' && (
+            <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
+              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:24}}>Global Varlıklar</h2>
+              {globalLoading && <div style={{color:'var(--text-muted)', textAlign:'center', padding:40}}><Loader2 className="spinner" size={32} /></div>}
+              {!globalLoading && Object.entries(GLOBAL_SYMBOLS).map(([category, symbols]) => {
+                const categoryAssets = globalAssets.filter(a => symbols.includes(a.ticker));
+                if (categoryAssets.length === 0) return null;
+                const emojis: Record<string,string> = {'ABD Hisseleri':'🇺🇸', 'Döviz':'💱', 'Emtia':'🥇', 'Kripto':'₿'};
+                return (
+                  <div key={category} style={{marginBottom:32}}>
+                    <h3 style={{fontSize:'1.2rem', fontWeight:700, marginBottom:16}}>{emojis[category]} {category}</h3>
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:16}}>
+                      {categoryAssets.map(a => {
+                        const isPos = a.change > 0;
+                        return (
+                          <div key={a.ticker} style={{padding:20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
+                            <div style={{fontWeight:800, fontSize:'1.1rem', color:'#fff', marginBottom:4}}>{a.ticker}</div>
+                            <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:12, height:'2.2em', overflow:'hidden'}}>{a.companyName}</div>
+                            <div style={{fontSize:'1.4rem', fontWeight:700, marginBottom:4}}>{a.currentPrice?.toFixed(a.assetType === 'FX' ? 4 : 2)} {a.currency}</div>
+                            <div style={{fontSize:'0.95rem', fontWeight:600, color: isPos ? 'var(--accent-primary)' : 'var(--accent-negative)'}}>
+                              {isPos ? '▲' : '▼'} {Math.abs(a.change).toFixed(2)}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {activeTab === 'screener' && (
             <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
               <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:8}}>Hisse Tarayıcı</h2>
