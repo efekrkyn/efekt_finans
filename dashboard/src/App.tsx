@@ -132,7 +132,7 @@ export default function App() {
 
   // AI Assistant State
   const [assistantMessages, setAssistantMessages] = useState<{role: 'user'|'assistant'|'system', content: string}[]>([
-    { role: 'system', content: 'Merhaba! Ben Dexter AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }
+    { role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }
   ]);
   const [assistantInput, setAssistantInput] = useState('');
   const [isAssistantTyping, setIsAssistantTyping] = useState(false);
@@ -673,7 +673,7 @@ export default function App() {
       <aside style={{ width: '260px', backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', position: isMobile ? 'fixed' : 'static', top: 0, left: 0, height: '100vh', zIndex: 200, transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
         <div style={{ padding: '24px', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Activity color="var(--accent-primary)" />
-          Dexter
+          Efekt
         </div>
         
         <div style={{ padding: '0 20px', marginBottom: '24px' }}>
@@ -883,10 +883,31 @@ export default function App() {
           )}
 
           {/* DEFAULT HOME VIEW ("Piyasalar") */}
-          {!data && !loading && !error && activeTab !== 'fund' && (
+          {!data && !loading && !error && activeTab === 'quarterly' && (
             <div className="animated-fade-in" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: '32px' }}>
               
               <div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+                  <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} color="var(--accent-primary)"/> Yaklaşan Ajanda <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>TUPRS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Yarın</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>THYAO - Yatırımcı Sunumu</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>12 Mayıs</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>KCHOL - Temettü (4.5 ₺)</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>15 Mayıs</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>ASELS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>20 Mayıs</span></div>
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><TrendingUp size={18} color="var(--accent-primary)"/> Sektör Performansları <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XBANK (Bankacılık)</span><span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>+2.45%</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XULAS (Ulaştırma)</span><span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>+1.12%</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XBLSM (Bilişim)</span><span style={{ fontWeight: 700, color: 'var(--accent-negative)' }}>-0.85%</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XGIDA (Gıda İçecek)</span><span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>+0.34%</span></div>
+                    </div>
+                  </div>
+                </div>
+
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '24px' }}>BIST 100 Popüler Hisseler</h2>
                 
                 {/* 10 Box Stocks */}
@@ -928,27 +949,6 @@ export default function App() {
                       {idx}
                     </ClickableCard>
                   ))}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px', marginTop: '32px' }}>
-                  <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} color="var(--accent-primary)"/> Yaklaşan Ajanda <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>TUPRS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Yarın</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>THYAO - Yatırımcı Sunumu</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>12 Mayıs</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>KCHOL - Temettü (4.5 ₺)</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>15 Mayıs</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>ASELS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>20 Mayıs</span></div>
-                    </div>
-                  </div>
-                  <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><TrendingUp size={18} color="var(--accent-primary)"/> Sektör Performansları <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XBANK (Bankacılık)</span><span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>+2.45%</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XULAS (Ulaştırma)</span><span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>+1.12%</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XBLSM (Bilişim)</span><span style={{ fontWeight: 700, color: 'var(--accent-negative)' }}>-0.85%</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>XGIDA (Gıda İçecek)</span><span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>+0.34%</span></div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1002,7 +1002,7 @@ export default function App() {
               )}
             </div>
           )}
-\n          {activeTab === 'watchlist' && (
+          {activeTab === 'watchlist' && (
             <div className="animated-fade-in" style={{ padding: '32px' }}>
               <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px' }}>İzleme Listesi</h2>
               {watchlist.length === 0 ? (
@@ -1234,7 +1234,7 @@ export default function App() {
                   <MessageSquare size={24} color="var(--accent-primary)" /> AI Finansal Asistan
                 </h2>
                 <button 
-                  onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Dexter AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }])}
+                  onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }])}
                   style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
                 >
                   Geçmişi Temizle
@@ -1246,7 +1246,7 @@ export default function App() {
                   <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.02)', color: msg.role === 'user' ? '#000' : 'var(--text-main)', padding: '20px', borderRadius: '12px', border: msg.role === 'user' ? 'none' : '1px solid var(--glass-border)' }}>
                     {msg.role !== 'user' && msg.role !== 'system' && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--accent-primary)' }}>
-                        <Activity size={16} /> <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>Dexter AI</span>
+                        <Activity size={16} /> <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>Efekt AI</span>
                       </div>
                     )}
                     <div style={{ lineHeight: '1.6', fontSize: '1.05rem', overflowX: 'auto' }}>

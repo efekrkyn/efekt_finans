@@ -109,6 +109,7 @@ cp env.example .env
 
 ## 🚀 How to Run
 
+### Option 1: CLI Interface (Original)
 Run Dexter in interactive mode:
 ```bash
 bun start
@@ -118,6 +119,28 @@ Or with watch mode for development:
 ```bash
 bun dev
 ```
+
+### Option 2: Dexter Dashboard (Web UI)
+Dexter now includes a rich Web Dashboard providing a visual interface for BIST stock analysis, real-time AI chats, AI Fund recommendations, and visual charts.
+
+1. **Start the Backend API**:
+   ```bash
+   bun run src/server.ts
+   ```
+   *The API will start on `http://localhost:3000`.*
+
+2. **Start the Frontend Dashboard**:
+   In a separate terminal, run:
+   ```bash
+   cd dashboard
+   npm run dev
+   # or
+   bun run dev
+   ```
+   *The dashboard will start on `http://localhost:5173`.*
+
+> **Note**: Both the Backend server and Frontend dev server must be running simultaneously to use the Dashboard effectively in development mode.
+
 
 ## 📊 How to Evaluate
 

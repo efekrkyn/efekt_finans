@@ -1,6 +1,6 @@
 {
-  "name": "Dexter — BIST Analiz",
-  "short_name": "Dexter",
+  "name": "Efekt — BIST Analiz",
+  "short_name": "Efekt",
   "description": "BIST finansal analiz ve AI asistan",
   "start_url": "/",
   "display": "standalone",

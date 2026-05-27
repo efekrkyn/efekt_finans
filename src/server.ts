@@ -710,7 +710,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
-    // 3. API: Advanced AI Chat with Dexter Agent (SSE)
+    // 3. API: Advanced AI Chat with Efekt Agent (SSE)
     if (path === '/api/chat' && req.method === 'POST') {
       return new Response(new ReadableStream({
         async start(controller) {
