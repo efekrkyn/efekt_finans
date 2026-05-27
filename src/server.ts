@@ -359,7 +359,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-v4-pro' });
+            ], { model: 'deepseek-chat' });
 
             for await (const chunk of stream) {
               const content = chunk.content;
