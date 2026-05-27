@@ -377,12 +377,13 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
   }
 
-  #print-area {
+  #print-area, #app-wrapper {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    position: static !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
   }
 
   .main-content {

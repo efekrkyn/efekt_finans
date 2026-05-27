@@ -784,7 +784,7 @@ export default function App() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div id="app-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* TOPBAR */}
         {activeTab !== 'assistant' && (
