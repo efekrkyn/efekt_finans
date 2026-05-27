@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Search, Activity, Loader2, Briefcase, TrendingUp,
-  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor } from 'lucide-react';
+  Search, ArrowUpRight, ArrowDownRight, Activity, DollarSign, TrendingUp, Download, Check, AlertCircle, Info, PieChart, Briefcase, ChevronDown, 
+  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2 } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
@@ -88,16 +88,41 @@ interface AnalysisResult {
   technicalIndicators?: TechnicalIndicators;
 }
 
+const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+
+const safeLocalStorage = {
+  getItem(key: string): string | null {
+    if (!isBrowser) return null;
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem(key: string, value: string): void {
+    if (!isBrowser) return;
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  },
+  removeItem(key: string): void {
+    if (!isBrowser) return;
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  }
+};
+
 function getSessionId() {
-  let id = localStorage.getItem('dexter-session-id');
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem('dexter-session-id', id); }
+  let id = safeLocalStorage.getItem('dexter-session-id');
+  if (!id) { id = crypto.randomUUID(); safeLocalStorage.setItem('dexter-session-id', id); }
   return id;
 }
 const sessionId = getSessionId();
 
 export default function App() {
   const [theme, setTheme] = useState<'dark'|'light'|'system'>(() => {
-    return (localStorage.getItem('dexter-theme') as any) || 'dark';
+    return (safeLocalStorage.getItem('dexter-theme') as any) || 'dark';
   });
 
   useEffect(() => {
@@ -111,7 +136,7 @@ export default function App() {
       document.documentElement.setAttribute('data-theme', effective);
     };
     apply();
-    localStorage.setItem('dexter-theme', theme);
+    safeLocalStorage.setItem('dexter-theme', theme);
     if (theme === 'system') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', apply);
@@ -185,6 +210,44 @@ export default function App() {
         .then(d => { setHeatmapData(Array.isArray(d) ? d : []); setHeatmapLoading(false); })
         .catch(() => setHeatmapLoading(false));
     }
+  }, [activeTab, heatmapData.length]);
+
+  useEffect(() => {
+    if (activeTab === 'kap' && !globalKapNews && !globalKapLoading) {
+      const fetchKap = async () => {
+        setGlobalKapLoading(true);
+        setGlobalKapNews('');
+        try {
+          const res = await fetch('/api/kap-news', {
+            headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
+          });
+          const reader = res.body?.getReader();
+          const decoder = new TextDecoder();
+          if (reader) {
+            let chunk = await reader.read();
+            while (!chunk.done) {
+              const lines = decoder.decode(chunk.value).split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6);
+                  if (data === '[DONE]') break;
+                  try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.chunk) setGlobalKapNews(prev => prev + parsed.chunk);
+                  } catch (e) {}
+                }
+              }
+              chunk = await reader.read();
+            }
+          }
+        } catch (e) {
+          setGlobalKapNews('Hata oluştu.');
+        } finally {
+          setGlobalKapLoading(false);
+        }
+      };
+      fetchKap();
+    }
   }, [activeTab]);
 
   const GLOBAL_SYMBOLS = {
@@ -232,14 +295,85 @@ export default function App() {
   type Position = { ticker: string; lots: number; entryPrice: number; entryDate: string };
   const [portfolio, setPortfolio] = useState<Position[]>(() => {
     try {
-      const saved = localStorage.getItem('dexter-portfolio');
+      const saved = safeLocalStorage.getItem('dexter-portfolio');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
   const [portfolioPrices, setPortfolioPrices] = useState<Record<string, number>>({});
+  
+  const [portfolioAnalysis, setPortfolioAnalysis] = useState('');
+  const [portfolioAiLoading, setPortfolioAiLoading] = useState(false);
+  const [portfolioAiError, setPortfolioAiError] = useState<string | null>(null);
+
+  const [globalKapNews, setGlobalKapNews] = useState('');
+  const [globalKapLoading, setGlobalKapLoading] = useState(false);
+
+  const [backtestTicker, setBacktestTicker] = useState('THYAO');
+  const [backtestYears, setBacktestYears] = useState(3);
+  const [backtestResult, setBacktestResult] = useState<any>(null);
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+
+  const runBacktest = async () => {
+    setBacktestLoading(true);
+    setBacktestError(null);
+    try {
+      const res = await fetch('/api/backtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: backtestTicker.toUpperCase(), strategy: 'sma', years: backtestYears })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Bilinmeyen hata');
+      setBacktestResult(data);
+    } catch (e: any) {
+      setBacktestError(e.message);
+    } finally {
+      setBacktestLoading(false);
+    }
+  };
+  
+  const optimizePortfolio = async () => {
+    if (portfolio.length === 0) return;
+    setPortfolioAiLoading(true);
+    setPortfolioAnalysis('');
+    setPortfolioAiError(null);
+    try {
+      const res = await fetch('/api/portfolio-optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        body: JSON.stringify({ portfolio })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let chunk = await reader.read();
+        while (!chunk.done) {
+          const lines = decoder.decode(chunk.value).split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) { setPortfolioAiError(parsed.error); break; }
+                if (parsed.chunk) setPortfolioAnalysis(prev => prev + parsed.chunk);
+              } catch (e) {}
+            }
+          }
+          chunk = await reader.read();
+        }
+      }
+    } catch (e: any) {
+      setPortfolioAiError(e.message);
+    } finally {
+      setPortfolioAiLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('dexter-portfolio', JSON.stringify(portfolio));
+    safeLocalStorage.setItem('dexter-portfolio', JSON.stringify(portfolio));
   }, [portfolio]);
 
   useEffect(() => {
@@ -256,12 +390,12 @@ export default function App() {
 
   type Alert = { id: string; ticker: string; condition: 'above'|'below'; price: number; createdAt: string };
   const [alerts, setAlerts] = useState<Alert[]>(() => {
-    try { return JSON.parse(localStorage.getItem('dexter-alerts') || '[]'); } catch { return []; }
+    try { return JSON.parse(safeLocalStorage.getItem('dexter-alerts') || '[]'); } catch { return []; }
   });
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
   const [triggeredAlerts, setTriggeredAlerts] = useState<Alert[]>([]);
 
-  useEffect(() => { localStorage.setItem('dexter-alerts', JSON.stringify(alerts)); }, [alerts]);
+  useEffect(() => { safeLocalStorage.setItem('dexter-alerts', JSON.stringify(alerts)); }, [alerts]);
 
   useEffect(() => {
     if (alerts.length === 0) return;
@@ -331,14 +465,14 @@ export default function App() {
     didMountRef.current = true;
 
     try {
-      const saved = localStorage.getItem('fintables-watchlist');
+      const saved = safeLocalStorage.getItem('fintables-watchlist');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) setWatchlist(parsed.filter(t => typeof t === 'string'));
       }
     } catch (e) {
       console.warn('Watchlist parse failed, resetting:', e);
-      localStorage.removeItem('fintables-watchlist');
+      safeLocalStorage.removeItem('fintables-watchlist');
     }
     
     fetch('/api/market-summary')
@@ -361,7 +495,7 @@ export default function App() {
   const toggleWatchlist = (ticker: string) => {
     const updated = watchlist.includes(ticker) ? watchlist.filter(t => t !== ticker) : [...watchlist, ticker];
     setWatchlist(updated);
-    localStorage.setItem('fintables-watchlist', JSON.stringify(updated));
+    safeLocalStorage.setItem('fintables-watchlist', JSON.stringify(updated));
   };
 
   const loadAbortRef = useRef<AbortController | null>(null);
@@ -408,7 +542,7 @@ export default function App() {
     const ctrl = new AbortController();
     aiAbortRef.current = ctrl;
     setAiLoading(true);
-    setAiAnalysis(null);
+    setAiAnalysis('');
     setAiSentiment(null);
     setAiError(null);
     
@@ -749,10 +883,12 @@ export default function App() {
 
         <nav style={{ flex: 1, padding: '0 12px' }}>
           {[
-            { id: 'dashboard', label: 'Piyasalar', icon: LayoutGrid, active: !data && activeTab !== 'fund' && activeTab !== 'assistant' && activeTab !== 'portfolio' },
-            { id: 'stocks', label: 'Hisseler', icon: BarChart, active: !!data && activeTab !== 'fund' },
+            { id: 'dashboard', label: 'Piyasalar', icon: LayoutGrid, active: !data && activeTab !== 'fund' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'kap' },
+            { id: 'stocks', label: 'Hisseler', icon: BarChart, active: !!data && activeTab !== 'fund' && activeTab !== 'backtest' && activeTab !== 'kap' },
             { id: 'watchlist', label: 'İzleme Listesi', icon: List, active: activeTab === 'watchlist' },
             { id: 'portfolio', label: 'Portföyüm', icon: Briefcase, active: activeTab === 'portfolio' },
+            { id: 'backtest', label: 'Backtest', icon: Activity, active: activeTab === 'backtest' },
+            { id: 'kap', label: 'KAP Canlı', icon: Bell, active: activeTab === 'kap' },
             { id: 'agenda', label: 'Ajanda', icon: Calendar, active: activeTab === 'agenda' },
             { id: 'screener', label: 'Tarayıcı', icon: Search, active: activeTab === 'screener' },
             { id: 'global', label: 'Global', icon: TrendingUp, active: activeTab === 'global' },
@@ -766,6 +902,8 @@ export default function App() {
                 if (item.id === 'stocks') { if (!data) loadStock('THYAO'); setActiveTab('quarterly'); }
                 if (item.id === 'watchlist') { setActiveTab('watchlist'); }
                 if (item.id === 'portfolio') { setActiveTab('portfolio'); }
+                if (item.id === 'backtest') { setData(null); setActiveTab('backtest'); }
+                if (item.id === 'kap') { setData(null); setActiveTab('kap'); }
                 if (item.id === 'agenda') { setActiveTab('agenda'); }
                 if (item.id === 'screener') { setData(null); setActiveTab('screener'); }
                 if (item.id === 'global') { setData(null); setActiveTab('global'); }
@@ -1064,6 +1202,134 @@ export default function App() {
                   downloadCsv(`portfoy_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
                 }} />
               )}
+              
+              {portfolio.length > 0 && (
+                <div style={{ marginTop: '32px' }}>
+                  <button 
+                    onClick={optimizePortfolio}
+                    disabled={portfolioAiLoading}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      backgroundColor: 'var(--accent-primary)',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '1.2rem',
+                      fontWeight: 800,
+                      cursor: portfolioAiLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: '12px',
+                      transition: 'all 0.2s',
+                      opacity: portfolioAiLoading ? 0.7 : 1
+                    }}
+                  >
+                    {portfolioAiLoading ? <Loader2 className="spinner" size={24} /> : <Sparkles size={24} />}
+                    {portfolioAiLoading ? 'Yapay Zeka Portföyü Analiz Ediyor...' : 'Portföyü Yapay Zeka ile Optimize Et'}
+                  </button>
+                  
+                  {portfolioAiError && (
+                    <div style={{ padding: '16px', backgroundColor: 'var(--accent-negative-rgb)', border: '1px solid var(--accent-negative)', color: '#fff', borderRadius: '8px', marginTop: '16px' }}>
+                      {portfolioAiError}
+                    </div>
+                  )}
+                  
+                  {portfolioAnalysis && (
+                    <div className="animated-fade-in" style={{ marginTop: '24px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '32px', lineHeight: '1.6' }}>
+                      <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <BrainCircuit size={24} /> Portföy Optimizasyon Raporu (DeepSeek V4 Pro)
+                      </h3>
+                      <div>{parseMarkdown(portfolioAnalysis)}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {activeTab === 'backtest' && (
+            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
+                <Activity size={32} color="var(--accent-primary)" /> Backtest Simülatörü
+              </h2>
+              
+              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '24px', marginBottom: '32px', display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Hisse Simgesi</label>
+                  <input value={backtestTicker} onChange={(e) => setBacktestTicker(e.target.value.toUpperCase())} placeholder="Örn: THYAO" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1rem' }} />
+                </div>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Süre</label>
+                  <select value={backtestYears} onChange={(e) => setBacktestYears(Number(e.target.value))} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-card)', color: '#fff', fontSize: '1rem' }}>
+                    <option value={1}>Son 1 Yıl</option>
+                    <option value={3}>Son 3 Yıl</option>
+                    <option value={5}>Son 5 Yıl</option>
+                  </select>
+                </div>
+                <button onClick={runBacktest} disabled={backtestLoading} style={{ padding: '12px 32px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 800, fontSize: '1rem', cursor: backtestLoading ? 'not-allowed' : 'pointer' }}>
+                  {backtestLoading ? 'Hesaplanıyor...' : 'Testi Başlat'}
+                </button>
+              </div>
+
+              {backtestError && (
+                <div style={{ padding: '16px', backgroundColor: 'var(--accent-negative-rgb)', border: '1px solid var(--accent-negative)', color: '#fff', borderRadius: '8px', marginBottom: '24px' }}>
+                  {backtestError}
+                </div>
+              )}
+
+              {backtestResult && (
+                <div className="animated-fade-in" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '32px' }}>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '24px' }}>SMA (20-50) Kesişim Stratejisi Sonuçları</h3>
+                  
+                  <div style={{ display: 'flex', gap: '24px', marginBottom: '32px', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 250px', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Algoritma Getirisi</div>
+                      <div style={{ fontSize: '2rem', fontWeight: 800, color: Number(backtestResult.metrics.strategyReturn) >= 0 ? 'var(--accent-primary)' : 'var(--accent-negative)' }}>
+                        %{backtestResult.metrics.strategyReturn}
+                      </div>
+                    </div>
+                    <div style={{ flex: '1 1 250px', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Sadece Al & Tut Yapsaydın</div>
+                      <div style={{ fontSize: '2rem', fontWeight: 800, color: Number(backtestResult.metrics.baselineReturn) >= 0 ? 'var(--text-main)' : 'var(--accent-negative)' }}>
+                        %{backtestResult.metrics.baselineReturn}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ height: '400px', width: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={backtestResult.data} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                        <XAxis dataKey="date" stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} />
+                        <YAxis stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} domain={['auto', 'auto']} tickFormatter={(v: any) => (v/1000).toFixed(0)+'k'} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--bg-main)', border: '1px solid var(--glass-border)', borderRadius: '8px' }} />
+                        <Line type="monotone" dataKey="Strateji" stroke="var(--accent-primary)" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="AlTut" stroke="var(--text-muted)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {activeTab === 'kap' && (
+            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <Bell size={32} color="var(--accent-primary)" />
+                <h2 style={{ fontSize: '2rem', fontWeight: 800 }}>Canlı KAP Bildirimleri</h2>
+              </div>
+              
+              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '32px', lineHeight: '1.6' }}>
+                {globalKapLoading && !globalKapNews ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '60px', color: 'var(--accent-primary)' }}>
+                    <Loader2 className="spinner" size={32} />
+                    <span style={{ fontSize: '1.2rem', fontWeight: 600 }}>Yapay Zeka Tüm KAP Bildirimlerini Okuyup Özetliyor...</span>
+                  </div>
+                ) : (
+                  <div>{parseMarkdown(globalKapNews)}</div>
+                )}
+              </div>
             </div>
           )}
           {activeTab === 'watchlist' && (
@@ -1396,7 +1662,7 @@ export default function App() {
           )}
 
           {/* STOCK ANALYSIS VIEW */}
-          {data && !loading && !error && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && (
+          {data && !loading && !error && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'kap' && activeTab !== 'heatmap' && activeTab !== 'global' && activeTab !== 'screener' && (
             <div className="animated-fade-in">
               <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px', marginBottom: '24px', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px' }}>

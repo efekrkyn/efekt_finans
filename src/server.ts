@@ -710,6 +710,199 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
+    if (path === '/api/backtest' && req.method === 'POST') {
+      try {
+        const body = await req.json() as { ticker: string, strategy: string, years: number };
+        const ticker = body.ticker || 'THYAO';
+        const years = body.years || 1;
+        const strategy = body.strategy || 'sma';
+
+        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+        const period1 = new Date();
+        period1.setFullYear(period1.getFullYear() - years);
+        
+        const history = await yahooFinance.historical(ticker + '.IS', {
+          period1: period1,
+          interval: '1d'
+        });
+
+        if (!history || history.length === 0) throw new Error('Veri bulunamadı.');
+
+        let initialCapital = 100000;
+        let capital = initialCapital;
+        let position = 0;
+        
+        const resultData = [];
+        const initialPrice = history[0].close;
+        const baselineShares = initialCapital / initialPrice;
+
+        let smas = [];
+        if (strategy === 'sma') {
+           for (let i = 0; i < history.length; i++) {
+             const slice20 = history.slice(Math.max(0, i-20), i+1);
+             const slice50 = history.slice(Math.max(0, i-50), i+1);
+             const sma20 = slice20.reduce((s, d) => s + d.close, 0) / slice20.length;
+             const sma50 = slice50.reduce((s, d) => s + d.close, 0) / slice50.length;
+             smas.push({ sma20, sma50 });
+           }
+        }
+
+        for (let i = 0; i < history.length; i++) {
+           const price = history[i].close;
+           const date = history[i].date.toISOString().slice(0, 10);
+           
+           if (strategy === 'sma' && i > 50) {
+              const prev = smas[i-1];
+              const curr = smas[i];
+              if (prev.sma20 <= prev.sma50 && curr.sma20 > curr.sma50 && position === 0) {
+                 position = capital / price;
+                 capital = 0;
+              }
+              else if (prev.sma20 >= prev.sma50 && curr.sma20 < curr.sma50 && position > 0) {
+                 capital = position * price;
+                 position = 0;
+              }
+           }
+           
+           const currentPortfolioValue = capital + (position * price);
+           const currentBaselineValue = baselineShares * price;
+           
+           resultData.push({
+             date,
+             Strateji: Math.round(currentPortfolioValue),
+             "AlTut": Math.round(currentBaselineValue)
+           });
+        }
+        
+        const finalPortfolioValue = capital + (position * history[history.length-1].close);
+        const finalBaselineValue = baselineShares * history[history.length-1].close;
+        
+        const returnPct = ((finalPortfolioValue - initialCapital) / initialCapital) * 100;
+        const baselinePct = ((finalBaselineValue - initialCapital) / initialCapital) * 100;
+
+        return new Response(JSON.stringify({
+          data: resultData,
+          metrics: {
+            strategyReturn: returnPct.toFixed(2),
+            baselineReturn: baselinePct.toFixed(2)
+          }
+        }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+
+      } catch (err) {
+        return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    if (path === '/api/portfolio-optimize' && req.method === 'POST') {
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            const body = await req.json() as { portfolio: any[] };
+            const portfolio = body.portfolio || [];
+            
+            const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+            const enrichedPortfolio = await Promise.all(portfolio.map(async (p: any) => {
+               try {
+                 const q = await yahooFinance.quote(p.ticker + '.IS');
+                 return { ...p, currentPrice: q.regularMarketPrice, companyName: q.shortName };
+               } catch(e) {
+                 return p;
+               }
+            }));
+            
+            const prompt = `
+Aşağıda kullanıcının mevcut Borsa İstanbul portföyü yer almaktadır:
+${JSON.stringify(enrichedPortfolio, null, 2)}
+
+Sen üst düzey bir portföy yöneticisisin. Bu portföyü risk, sektörel çeşitlilik, ağırlıklar ve güncel piyasa koşulları açısından incele.
+Raporunu Markdown formatında şu başlıklarla hazırla:
+1. Portföy Özeti ve Kârlılık Durumu
+2. Risk Analizi ve Çeşitlendirme
+3. Güçlü ve Zayıf Yönler
+4. Aksiyon Önerileri (Hangi hisselerde ağırlık artırılabilir/azaltılabilir?)
+`;
+            
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'),
+              new HumanMessage(prompt)
+            ], { model: 'deepseek-v4-pro' });
+
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          } catch (err) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
+            controller.close();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    if (path === '/api/kap-news') {
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            const query = `Borsa İstanbul güncel KAP (Kamuyu Aydınlatma Platformu) bildirimleri ve şirket haberleri ${today}`;
+            log('info', 'tavily_search', { query });
+            const searchResults = await searchTavily(query);
+            
+            const prompt = `
+Aşağıda internetten derlenen Borsa İstanbul güncel KAP bildirimleri ve önemli şirket haberleri yer almaktadır:
+${searchResults}
+
+Sen uzman bir finansal analistsin. Bu haberleri inceleyerek Borsa İstanbul yatırımcıları için "Günün Önemli KAP Bildirimleri" adında kısa ve çok net bir özet rapor hazırla. Sadece piyasayı etkileyebilecek (temettü, bedelsiz, yeni ihale, birleşme, kâr açıklaması vb.) olaylara odaklan. Uzun ve gereksiz metinleri at.
+Markdown formatında hazırla.
+`;
+            
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir BIST finansal analisti ve haber editörüsün.'),
+              new HumanMessage(prompt)
+            ], { model: 'deepseek-chat' });
+
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          } catch (err) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
+            controller.close();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
     // 3. API: Advanced AI Chat with Efekt Agent (SSE)
     if (path === '/api/chat' && req.method === 'POST') {
       return new Response(new ReadableStream({

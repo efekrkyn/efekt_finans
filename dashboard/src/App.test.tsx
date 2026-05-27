@@ -14,7 +14,7 @@ describe('App Component', () => {
 
   it('renders the dashboard title', () => {
     render(<App />);
-    expect(screen.getByText(/Dexter/i)).toBeInTheDocument();
+    expect(screen.getByText(/Efekt/i)).toBeInTheDocument();
   });
 });
 
