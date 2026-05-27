@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, Activity, Loader2, Briefcase, TrendingUp,
-  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare
-} from 'lucide-react';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar } from 'recharts';
+  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu } from 'lucide-react';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 
 function ClickableCard({ onActivate, ariaLabel, children, ...rest }: any) {
   return (
@@ -74,7 +73,7 @@ function getSessionId() {
 const sessionId = getSessionId();
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,6 +104,99 @@ export default function App() {
 
   const [marketSummary, setMarketSummary] = useState<MarketSummary | null>(null);
   const [watchlist, setWatchlist] = useState<string[]>([]);
+
+  const [priceHistory, setPriceHistory] = useState<{points: {date: string, close: number, volume: number}[]} | null>(null);
+  const [priceRange, setPriceRange] = useState<'1m'|'3m'|'6m'|'1y'|'5y'>('1y');
+
+  useEffect(() => {
+    if (activeTab === 'charts' && data) {
+      fetch(`/api/price-history?ticker=${data.ticker}&range=${priceRange}`)
+        .then(r => r.json())
+        .then(setPriceHistory)
+        .catch(e => console.error(e));
+    }
+  }, [activeTab, data, priceRange]);
+
+
+  type Position = { ticker: string; lots: number; entryPrice: number; entryDate: string };
+  const [portfolio, setPortfolio] = useState<Position[]>(() => {
+    try {
+      const saved = localStorage.getItem('dexter-portfolio');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [portfolioPrices, setPortfolioPrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    localStorage.setItem('dexter-portfolio', JSON.stringify(portfolio));
+  }, [portfolio]);
+
+  useEffect(() => {
+    if (activeTab !== 'portfolio' || portfolio.length === 0) return;
+    Promise.all(portfolio.map(p =>
+      fetch(`/api/analysis?ticker=${p.ticker}`).then(r => r.json()).catch(() => null)
+    )).then(results => {
+      const prices: Record<string, number> = {};
+      results.forEach((r: any, i) => { if (r?.currentPrice) prices[portfolio[i].ticker] = r.currentPrice; });
+      setPortfolioPrices(prices);
+    });
+  }, [activeTab, portfolio]);
+
+
+  type Alert = { id: string; ticker: string; condition: 'above'|'below'; price: number; createdAt: string };
+  const [alerts, setAlerts] = useState<Alert[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dexter-alerts') || '[]'); } catch { return []; }
+  });
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  const [triggeredAlerts, setTriggeredAlerts] = useState<Alert[]>([]);
+
+  useEffect(() => { localStorage.setItem('dexter-alerts', JSON.stringify(alerts)); }, [alerts]);
+
+  useEffect(() => {
+    if (alerts.length === 0) return;
+    const check = async () => {
+      const uniqueTickers = [...new Set(alerts.map(a => a.ticker))];
+      const prices: Record<string, number> = {};
+      await Promise.all(uniqueTickers.map(async t => {
+        try {
+          const r = await fetch(`/api/analysis?ticker=${t}`);
+          const j = await r.json();
+          if (j.currentPrice) prices[t] = j.currentPrice;
+        } catch {}
+      }));
+      const newTriggers: Alert[] = [];
+      alerts.forEach(a => {
+        const p = prices[a.ticker];
+        if (!p) return;
+        if (a.condition === 'above' && p >= a.price) newTriggers.push(a);
+        if (a.condition === 'below' && p <= a.price) newTriggers.push(a);
+      });
+      if (newTriggers.length) {
+        setTriggeredAlerts(prev => [...prev, ...newTriggers]);
+        if ('Notification' in window && Notification.permission === 'granted') {
+          newTriggers.forEach(a => new Notification(`${a.ticker} hedefe ulaştı`, {
+            body: `${a.condition === 'above' ? '≥' : '≤'} ${a.price} ₺ (güncel: ${prices[a.ticker].toFixed(2)} ₺)`
+          }));
+        }
+        setAlerts(prev => prev.filter(a => !newTriggers.find(t => t.id === a.id)));
+      }
+    };
+    check();
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
+  }, [alerts]);
+
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
 
   const searchRef = useRef<HTMLDivElement>(null);
   const compareRef = useRef<HTMLDivElement>(null);
@@ -350,6 +442,21 @@ export default function App() {
     }, 250);
   };
 
+  
+  const downloadCsv = (filename: string, headers: string[], rows: (string|number)[][]) => {
+    const escape = (v: any) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    };
+    const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+
   const formatMoney = (val: any) => {
     if (val == null) return '-';
     const n = Number(val);
@@ -411,9 +518,14 @@ export default function App() {
   };
 
   return (
-    <div id="print-area" className="app-container" style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+    <div id="print-area" className="app-container" style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: '"Plus Jakarta Sans", sans-serif', position: 'relative' }}>
+      
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.6)', zIndex:150}} />
+      )}
+      
       {/* LEFT SIDEBAR */}
-      <aside style={{ width: '260px', backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{ width: '260px', backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', position: isMobile ? 'fixed' : 'static', top: 0, left: 0, height: '100vh', zIndex: 200, transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
         <div style={{ padding: '24px', fontSize: '1.5rem', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Activity color="var(--accent-primary)" />
           Dexter
@@ -428,9 +540,10 @@ export default function App() {
 
         <nav style={{ flex: 1, padding: '0 12px' }}>
           {[
-            { id: 'dashboard', label: 'Piyasalar', icon: LayoutGrid, active: !data && activeTab !== 'fund' && activeTab !== 'assistant' },
+            { id: 'dashboard', label: 'Piyasalar', icon: LayoutGrid, active: !data && activeTab !== 'fund' && activeTab !== 'assistant' && activeTab !== 'portfolio' },
             { id: 'stocks', label: 'Hisseler', icon: BarChart, active: !!data && activeTab !== 'fund' },
             { id: 'watchlist', label: 'İzleme Listesi', icon: List, active: activeTab === 'watchlist' },
+            { id: 'portfolio', label: 'Portföyüm', icon: Briefcase, active: activeTab === 'portfolio' },
             { id: 'agenda', label: 'Ajanda', icon: Calendar, active: activeTab === 'agenda' },
             { id: 'assistant', label: 'AI Asistan', icon: MessageSquare, active: activeTab === 'assistant' }
           ].map(item => (
@@ -440,8 +553,10 @@ export default function App() {
                 if (item.id === 'dashboard') { setData(null); setActiveTab('quarterly'); }
                 if (item.id === 'stocks') { if (!data) loadStock('THYAO'); setActiveTab('quarterly'); }
                 if (item.id === 'watchlist') { setActiveTab('watchlist'); }
+                if (item.id === 'portfolio') { setActiveTab('portfolio'); }
                 if (item.id === 'agenda') { setActiveTab('agenda'); }
                 if (item.id === 'assistant') { setData(null); setActiveTab('assistant'); }
+                if (isMobile) setSidebarOpen(false);
               }}
               ariaLabel={item.label}
               style={{ padding: '12px 16px', margin: '4px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: item.active ? '#fff' : 'var(--text-muted)', backgroundColor: item.active ? 'rgba(255,255,255,0.05)' : 'transparent', cursor: 'pointer', fontWeight: item.active ? 600 : 400 }}
@@ -459,7 +574,12 @@ export default function App() {
         {/* TOPBAR */}
         {activeTab !== 'assistant' && (
         <header style={{ height: '70px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', padding: '0 24px', backgroundColor: 'var(--bg-card)', gap: '24px' }}>
-          <div ref={searchRef} style={{ position: 'relative', width: '300px' }}>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" style={{background:'none', border:'none', color:'#fff', cursor:'pointer', padding:8, marginRight:16}}>
+              <Menu size={24} />
+            </button>
+          )}
+          <div ref={searchRef} style={{ position: 'relative', width: isMobile ? '100%' : '300px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input 
               value={tickerInput}
@@ -484,7 +604,53 @@ export default function App() {
             )}
           </div>
           
-          <div style={{ display: 'flex', gap: '32px', marginLeft: 'auto' }}>
+          <div style={{ display: isMobile ? 'none' : 'flex', gap: '32px', marginLeft: 'auto', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <button aria-label={`Bildirimler (${alerts.length} aktif, ${triggeredAlerts.length} tetiklendi)`}
+                onClick={async () => {
+                  if ('Notification' in window && Notification.permission === 'default') {
+                    await Notification.requestPermission();
+                  }
+                  setShowAlertsPanel(s => !s);
+                }}
+                style={{position:'relative', background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0}}>
+                <Bell size={20} />
+                {(alerts.length + triggeredAlerts.length) > 0 && (
+                  <span style={{position:'absolute', top:-4, right:-4, backgroundColor:'var(--accent-negative)', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                    {alerts.length + triggeredAlerts.length}
+                  </span>
+                )}
+              </button>
+              {showAlertsPanel && (
+                <div style={{position:'absolute', top:30, right:0, width:320, backgroundColor:'var(--bg-card)', border:'1px solid var(--glass-border)', borderRadius:12, padding:20, zIndex:100, boxShadow:'0 10px 40px rgba(0,0,0,0.5)'}}>
+                  <h3 style={{fontSize:'1.1rem', fontWeight:700, marginBottom:16}}>Uyarılar</h3>
+                  {triggeredAlerts.length > 0 && (
+                    <div style={{marginBottom:16}}>
+                      <div style={{color:'var(--accent-primary)', fontSize:'0.85rem', fontWeight:700, marginBottom:8}}>TETİKLENEN</div>
+                      {triggeredAlerts.map(a => (
+                        <div key={a.id} style={{padding:10, backgroundColor:'rgba(16,185,129,0.1)', borderRadius:6, marginBottom:6, fontSize:'0.9rem'}}>
+                          <strong>{a.ticker}</strong> {a.condition === 'above' ? '≥' : '≤'} {a.price} ₺
+                        </div>
+                      ))}
+                      <button onClick={() => setTriggeredAlerts([])} style={{fontSize:'0.8rem', color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer'}}>Hepsini temizle</button>
+                    </div>
+                  )}
+                  {alerts.length === 0 && triggeredAlerts.length === 0 ? (
+                    <div style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>Henüz uyarı yok. Bir hisse açıp "Uyarı Kur" ile başla.</div>
+                  ) : (
+                    <>
+                      <div style={{color:'var(--text-muted)', fontSize:'0.85rem', fontWeight:700, marginBottom:8}}>AKTİF</div>
+                      {alerts.map(a => (
+                        <div key={a.id} style={{display:'flex', justifyContent:'space-between', padding:10, backgroundColor:'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:6, fontSize:'0.9rem'}}>
+                          <span><strong>{a.ticker}</strong> {a.condition === 'above' ? '≥' : '≤'} {a.price} ₺</span>
+                          <button onClick={() => setAlerts(p => p.filter(x => x.id !== a.id))} style={{background:'none', border:'none', color:'var(--accent-negative)', cursor:'pointer'}}>×</button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             {['xu100', 'usdtry', 'eurtry'].map((key) => {
               const mData = marketSummary?.[key as keyof MarketSummary];
               const price = mData?.price;
@@ -542,13 +708,13 @@ export default function App() {
 
           {/* DEFAULT HOME VIEW ("Piyasalar") */}
           {!data && !loading && !error && activeTab !== 'fund' && (
-            <div className="animated-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '32px' }}>
+            <div className="animated-fade-in" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: '32px' }}>
               
               <div>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '24px' }}>BIST 100 Popüler Hisseler</h2>
                 
                 {/* 10 Box Stocks */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '16px', marginBottom: '32px' }}>
                   {['THYAO', 'TUPRS', 'KCHOL', 'AKBNK', 'ASELS', 'BIMAS', 'EREGL', 'ISCTR', 'SAHOL', 'YKBNK'].map(idx => (
                     <ClickableCard 
                       key={idx} 
@@ -566,7 +732,7 @@ export default function App() {
 
                 {/* 90 List Stocks */}
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-muted)' }}>Diğer Hisseler (Liste Görünümü)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)', maxHeight: '400px', overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: '8px', backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)', maxHeight: '400px', overflowY: 'auto' }}>
                   {[
                     'ENKAI', 'GARAN', 'SISE', 'FROTO', 'PGSUS', 'TOASO', 'TCELL', 'SASA', 'HEKTS', 'TTKOM', 'ALARK', 'MGROS', 'DOAS', 'KRDMD', 'KOZAL', 
                     'PETKM', 'ENJSA', 'ASTOR', 'EKGYO', 'TTRAK', 'VAKBN', 'GUBRF', 'OYAKC', 'KORDS', 'SOKM', 'VESBE', 'ARCLK', 'ODAS', 'KMPUR', 'HALKB', 
@@ -588,7 +754,7 @@ export default function App() {
                   ))}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px', marginTop: '32px' }}>
                   <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} color="var(--accent-primary)"/> Yaklaşan Ajanda <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -636,7 +802,31 @@ export default function App() {
           )}
 
           {/* WATCHLIST VIEW */}
-          {activeTab === 'watchlist' && (
+          
+          {activeTab === 'portfolio' && (
+            <div className="animated-fade-in" style={{padding: isMobile ? 16 : 32, maxWidth:1100, margin:'0 auto'}}>
+              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:8}}>Kağıt Portföyüm</h2>
+              <p style={{color:'var(--text-muted)', marginBottom:24}}>Gerçek para riski olmadan strateji dene. Tüm veriler tarayıcında saklanır.</p>
+
+              <AddPositionForm onAdd={(pos) => setPortfolio(p => [...p, pos])} />
+
+              {portfolio.length === 0 ? (
+                <div style={{textAlign:'center', padding:60, color:'var(--text-muted)'}}>Henüz pozisyon yok. Yukarıdan ekle.</div>
+              ) : (
+                <PortfolioTable portfolio={portfolio} prices={portfolioPrices} onRemove={(i) => setPortfolio(p => p.filter((_,idx) => idx !== i))} onDownload={() => {
+                  const headers = ['Sembol','Lot','Giriş Fiyatı','Giriş Tarihi','Güncel Fiyat','K/Z (₺)','K/Z (%)'];
+                  const rows = portfolio.map(p => {
+                    const cur = portfolioPrices[p.ticker] || p.entryPrice;
+                    const pl = (cur - p.entryPrice) * p.lots;
+                    const plPct = ((cur - p.entryPrice) / p.entryPrice) * 100;
+                    return [p.ticker, p.lots, p.entryPrice, p.entryDate, cur.toFixed(2), pl.toFixed(2), plPct.toFixed(2)];
+                  });
+                  downloadCsv(`portfoy_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
+                }} />
+              )}
+            </div>
+          )}
+\n          {activeTab === 'watchlist' && (
             <div className="animated-fade-in" style={{ padding: '32px' }}>
               <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px' }}>İzleme Listesi</h2>
               {watchlist.length === 0 ? (
@@ -796,6 +986,34 @@ export default function App() {
                 <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px' }}>
                   <button onClick={() => window.print()} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     PDF İndir
+                  </button>
+                  <button onClick={() => {
+                        const periods = activeTab === 'annual' ? data.annual : data.quarterly;
+                        const headers = ['Kalem', ...periods.slice().reverse().map(p => p.periodLabel)];
+                        const rows = [
+                          ['Satış Gelirleri',  ...periods.slice().reverse().map(p => p.totalRevenue ?? '')],
+                          ['Brüt Kâr',         ...periods.slice().reverse().map(p => p.grossProfit ?? '')],
+                          ['FAVÖK',            ...periods.slice().reverse().map(p => p.ebitda ?? '')],
+                          ['Net Kâr',          ...periods.slice().reverse().map(p => p.netIncome ?? '')],
+                          ['Toplam Varlıklar', ...periods.slice().reverse().map(p => p.totalAssets ?? '')],
+                          ['Özsermaye',        ...periods.slice().reverse().map(p => p.stockholdersEquity ?? '')],
+                          ['Net Borç',         ...periods.slice().reverse().map(p => p.netDebt ?? '')],
+                          ['Serbest Nakit Akışı', ...periods.slice().reverse().map(p => p.freeCashFlow ?? '')],
+                        ];
+                        downloadCsv(`${data.ticker}_${activeTab === 'annual' ? 'yillik' : 'ceyreklik'}_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
+                      }}
+                      style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'#fff', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                    CSV İndir
+                  </button>
+                  <button onClick={() => {
+                        const above = prompt(`${data.ticker} için hedef fiyat (üstüne çıkarsa uyar):`, String((data.currentPrice * 1.05).toFixed(2)));
+                        if (!above) return;
+                        const v = parseFloat(above);
+                        if (isNaN(v)) return;
+                        setAlerts(p => [...p, { id: crypto.randomUUID(), ticker: data.ticker, condition: 'above', price: v, createdAt: new Date().toISOString() }]);
+                        alert(`Uyarı kuruldu: ${data.ticker} ≥ ${v} ₺`);
+                      }} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'#fff', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                    Uyarı Kur
                   </button>
                   <button onClick={() => toggleWatchlist(data.ticker)} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     {watchlist.includes(data.ticker) ? 'İzleme Listesinden Çıkar' : 'İzleme Listesine Ekle'}
@@ -996,6 +1214,40 @@ export default function App() {
               )}
               
               {activeTab === 'charts' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
+                      <h3 style={{fontSize:'1.2rem', fontWeight:700}}>{data.ticker} Fiyat Geçmişi</h3>
+                      <div style={{display:'flex', gap:8}}>
+                        {(['1m','3m','6m','1y','5y'] as const).map(r => (
+                          <button key={r} onClick={() => setPriceRange(r)}
+                            style={{padding:'6px 14px', borderRadius:6, border:'none',
+                              backgroundColor: priceRange===r ? 'var(--accent-primary)' : 'transparent',
+                              color: priceRange===r ? '#000' : 'var(--text-muted)',
+                              cursor:'pointer', fontWeight:600}}>
+                            {r === '1m' ? '1A' : r === '3m' ? '3A' : r === '6m' ? '6A' : r === '1y' ? '1Y' : '5Y'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {priceHistory && priceHistory.points.length > 0 ? (
+                      <div style={{width:'100%', height:400}}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={priceHistory.points} margin={{top:20, right:30, left:20, bottom:5}}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis dataKey="date" stroke="#999" tickFormatter={(d) => new Date(d).toLocaleDateString('tr-TR', {month:'short', year:'2-digit'})} />
+                            <YAxis stroke="#999" domain={['auto','auto']} tickFormatter={(v) => (v as number).toFixed(0)} />
+                            <Tooltip contentStyle={{backgroundColor:'#1c1c1c', border:'1px solid #333'}}
+                              labelFormatter={(d) => new Date(d).toLocaleDateString('tr-TR')}
+                              formatter={(v: any) => [Number(v).toFixed(2) + ' ₺', 'Kapanış']} />
+                            <Line type="monotone" dataKey="close" stroke="var(--accent-primary)" strokeWidth={2} dot={false} name="Kapanış" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div style={{color:'var(--text-muted)', padding:60, textAlign:'center'}}>Fiyat verisi yükleniyor...</div>
+                    )}
+                  </section>
                 <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '24px' }}>Gelir Büyümesi (Yıllık)</h3>
                   <div style={{ width: '100%', height: '400px' }}>
@@ -1011,12 +1263,90 @@ export default function App() {
                     </ResponsiveContainer>
                   </div>
                 </section>
-              )}
+                  </div>
+                )}
 
             </div>
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function AddPositionForm({onAdd}: {onAdd: (p: any) => void}) {
+  const [ticker, setTicker] = useState('');
+  const [lots, setLots] = useState('');
+  const [price, setPrice] = useState('');
+  const submit = () => {
+    if (!ticker || !lots || !price) return;
+    onAdd({
+      ticker: ticker.toUpperCase(),
+      lots: parseFloat(lots),
+      entryPrice: parseFloat(price),
+      entryDate: new Date().toISOString().slice(0,10)
+    });
+    setTicker(''); setLots(''); setPrice('');
+  };
+  return (
+    <div style={{display:'flex', gap:12, marginBottom:24, padding:20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
+      <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="Sembol (THYAO)"
+        style={{flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+      <input value={lots} onChange={e => setLots(e.target.value)} placeholder="Lot adedi" type="number"
+        style={{width:120, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+      <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Alış fiyatı ₺" type="number"
+        style={{width:140, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+      <button onClick={submit} disabled={!ticker || !lots || !price}
+        style={{padding:'10px 24px', borderRadius:8, border:'none', backgroundColor:'var(--accent-primary)', color:'#000', fontWeight:700, cursor:'pointer'}}>
+        Pozisyon Ekle
+      </button>
+    </div>
+  );
+}
+
+function PortfolioTable({portfolio, prices, onRemove, onDownload}: {portfolio: any[]; prices: Record<string, number>; onRemove: (i: number) => void; onDownload: () => void}) {
+  const totalCost = portfolio.reduce((s, p) => s + p.lots * p.entryPrice, 0);
+  const totalValue = portfolio.reduce((s, p) => s + p.lots * (prices[p.ticker] || p.entryPrice), 0);
+  const totalPL = totalValue - totalCost;
+  const totalPLPct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
+  return (
+    <div style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:24}}>
+      <div style={{display:'flex', justifyContent:'space-between', marginBottom:20, paddingBottom:20, borderBottom:'1px solid var(--glass-border)'}}>
+        <div style={{display:'flex', gap:32}}>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Toplam Maliyet</div><div style={{fontSize:'1.4rem', fontWeight:700}}>{totalCost.toFixed(2)} ₺</div></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Güncel Değer</div><div style={{fontSize:'1.4rem', fontWeight:700}}>{totalValue.toFixed(2)} ₺</div></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Kâr/Zarar</div>
+            <div style={{fontSize:'1.4rem', fontWeight:800, color: totalPL >= 0 ? 'var(--accent-primary)' : 'var(--accent-negative)'}}>
+              {totalPL >= 0 ? '+' : ''}{totalPL.toFixed(2)} ₺ ({totalPL >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}%)
+            </div>
+          </div>
+        </div>
+        <button onClick={onDownload} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'#fff', cursor:'pointer'}}>Portföyü CSV İndir</button>
+      </div>
+      <table style={{width:'100%'}}>
+        <thead><tr style={{color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'left'}}>
+          <th style={{padding:'12px 8px'}}>Sembol</th><th>Lot</th><th>Giriş</th><th>Güncel</th><th>K/Z</th><th></th>
+        </tr></thead>
+        <tbody>
+          {portfolio.map((p, i) => {
+            const cur = prices[p.ticker] || p.entryPrice;
+            const pl = (cur - p.entryPrice) * p.lots;
+            const plPct = ((cur - p.entryPrice) / p.entryPrice) * 100;
+            return (
+              <tr key={i} style={{borderTop:'1px solid var(--glass-border)'}}>
+                <td style={{padding:'14px 8px', fontWeight:700}}>{p.ticker}</td>
+                <td>{p.lots}</td>
+                <td>{p.entryPrice.toFixed(2)} ₺</td>
+                <td>{cur.toFixed(2)} ₺</td>
+                <td style={{color: pl >= 0 ? 'var(--accent-primary)' : 'var(--accent-negative)', fontWeight:700}}>
+                  {pl >= 0 ? '+' : ''}{pl.toFixed(2)} ₺ ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)
+                </td>
+                <td><button onClick={() => onRemove(i)} aria-label="Pozisyonu sil" style={{background:'none', border:'none', color:'var(--accent-negative)', cursor:'pointer', fontSize:18}}>×</button></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

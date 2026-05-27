@@ -1,7 +1,11 @@
 import { join } from 'path';
 import { fetchBISTData } from './utils/bist-data.js';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { checkEnv } from './utils/env-check.js';
+
+checkEnv();
 import YahooFinance from 'yahoo-finance2';
-import { callLlm } from './model/llm.js';
+import { callLlm, streamLlmWithMessages } from './model/llm.js';
 import { Agent } from './agent/agent.js';
 import { InMemoryChatHistory } from './utils/in-memory-chat-history.js';
 
@@ -10,6 +14,27 @@ const SESSION_TTL_MS = 1000 * 60 * 60; // 1 saat
 const sessionLastSeen = new Map<string, number>();
 
 const chatSessions: Record<string, InMemoryChatHistory> = {};
+
+const apiCache = new Map<string, {data: any, exp: number}>();
+function cacheGet(key: string) { const v = apiCache.get(key); if (v && v.exp > Date.now()) return v.data; return null; }
+function cacheSet(key: string, data: any, ttlMs: number) { apiCache.set(key, {data, exp: Date.now()+ttlMs}); }
+
+const rateLimits = new Map<string, number[]>();
+function rateLimit(req: Request, max: number, windowMs: number): boolean {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'local';
+  const key = `${ip}:${new URL(req.url).pathname}`;
+  const now = Date.now();
+  const hits = (rateLimits.get(key) || []).filter(t => now - t < windowMs);
+  if (hits.length >= max) return false;
+  hits.push(now); rateLimits.set(key, hits);
+  return true;
+}
+
+function log(level: 'info'|'warn'|'error', msg: string, meta?: object) {
+  const entry = { ts: new Date().toISOString(), level, msg, ...(meta||{}) };
+  console[level === 'error' ? 'error' : 'log'](JSON.stringify(entry));
+}
+
 
 function touchSession(id: string) {
   sessionLastSeen.set(id, Date.now());
@@ -95,6 +120,77 @@ const server = Bun.serve({
       });
     }
 
+    
+    // 0. API: Health Check
+    if (path === '/api/health') {
+      return new Response(JSON.stringify({
+        status: 'ok',
+        uptime: process.uptime(),
+        sessions: Object.keys(chatSessions).length,
+        cacheSize: apiCache.size,
+      }), {headers:{'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*'}});
+    }
+
+    // 0.2 API: Price History
+    if (path === '/api/price-history') {
+      const ticker = url.searchParams.get('ticker');
+      const range = url.searchParams.get('range') || '1y';
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json'}});
+      try {
+        const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
+        const end = new Date();
+        const start = new Date();
+        const days = range === '1m' ? 30 : range === '3m' ? 90 : range === '6m' ? 180 : range === '1y' ? 365 : 1825;
+        start.setDate(end.getDate() - days);
+        const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+        const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
+        const points = (history.quotes || [])
+          .filter((q: any) => typeof q.close === 'number')
+          .map((q: any) => ({ date: q.date, close: q.close, volume: q.volume }));
+        return new Response(JSON.stringify({ ticker, range, points }), {
+          headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({error:(err as Error).message}), {status:500, headers:{'Content-Type':'application/json'}});
+      }
+    }
+
+    // 0.5. API: Technicals
+    if (path === '/api/technicals') {
+      const ticker = url.searchParams.get('ticker');
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      
+      const cacheKey = `tech:${ticker}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'} });
+
+      try {
+        log('info', 'fetch_technicals', { ticker });
+        const yf = new YahooFinance({ suppressNotices: ['yahooSurvey','ripHistorical'] });
+        const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
+        const end = new Date();
+        const start = new Date(); start.setDate(end.getDate() - 200);
+        const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
+        const closes = history.quotes.map(q => q.close).filter((v): v is number => typeof v === 'number');
+        const { computeTechnicalIndicators } = await import('./utils/technical-indicators.js');
+        const bars = closes.map((c, i) => ({ date: `day${i}`, close: c }));
+        const indicators = computeTechnicalIndicators(bars);
+        
+        const result = {
+          rsi14: indicators.rsi,
+          sma20: indicators.sma20,
+          sma50: indicators.sma50,
+          macd: indicators.macd,
+        };
+        cacheSet(cacheKey, result, 1000 * 60 * 60); // 1 hour TTL
+        
+        return new Response(JSON.stringify(result), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      } catch(err) {
+        log('error', 'technicals_error', { error: (err as Error).message });
+        return new Response(JSON.stringify({error:(err as Error).message}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      }
+    }
+
     // 1. API: Analyze Stock
     if (path === '/api/analysis') {
       const ticker = url.searchParams.get('ticker');
@@ -108,8 +204,14 @@ const server = Bun.serve({
         });
       }
       try {
-        console.log(`[API] Analiz ediliyor: ${ticker}`);
+        if (!rateLimit(req, 20, 60000)) return new Response('Rate limited', {status:429, headers:{'Access-Control-Allow-Origin':'*'}});
+        const cached = cacheGet(`analysis:${ticker}`);
+        if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+        const startTime = Date.now();
+        log('info', 'analysis', { ticker });
         const data = await fetchBISTData(ticker);
+        cacheSet(`analysis:${ticker}`, data, 1000 * 60 * 5); // 5 mins
+        log('info', 'analysis_done', { ticker, durationMs: Date.now() - startTime });
         return new Response(JSON.stringify(data), {
           headers: {
             'Content-Type': 'application/json',
@@ -143,16 +245,22 @@ const server = Bun.serve({
       const authErr = requireApiKey();
       if (authErr) return authErr;
       
-      try {
-        console.log(`[API] AI Analiz ediliyor: ${ticker}`);
-        const financials = await fetchBISTData(ticker);
-        
-        const query = `${financials.companyName} (${ticker}) hisse son dakika haberleri gelişmeleri`;
-        console.log(`[API] AI Arama yapılıyor (Tavily): "${query}"`);
-        const searchResults = await searchTavily(query);
-        
-        const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-        const prompt = `
+      if (!rateLimit(req, 10, 60000)) return new Response('Rate limited', {status:429, headers:{'Access-Control-Allow-Origin':'*'}});
+      
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          try {
+            const startTime = Date.now();
+            log('info', 'ai-analysis', { ticker });
+            const financials = await fetchBISTData(ticker);
+            
+            const query = `${financials.companyName} (${ticker}) hisse son dakika haberleri gelişmeleri`;
+            log('info', 'tavily_search', { query });
+            const searchResults = await searchTavily(query);
+            
+            const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            const prompt = `
 Aşağıda Borsa İstanbul'da işlem gören ${financials.companyName} (${financials.ticker}) şirketine ait en güncel finansal veriler ve internetten derlenen son haberler yer almaktadır.
 
 Lütfen raporunun tam en başına hazırlayan bilgisini ve rapor tarihini şu şekilde ekle:
@@ -191,46 +299,35 @@ Sonda analizini bitirirken, raporun EN ALTINA şu formatta duyarlılık puanlar�
 Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı tamamen markdown olmalıdır.
 `;
 
-        console.log(`[API] Gemini çağrılıyor (${ticker})...`);
-        const result = await callLlm(prompt, {
-          model: 'gemini-flash-latest',
-          systemPrompt: 'Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'
-        });
+            log('info', 'llm_call', { ticker });
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'),
+              new HumanMessage(prompt)
+            ], { model: 'gemini-flash-latest' });
 
-        const fullResponse = result.response as string;
-        let positive = 50;
-        let neutral = 30;
-        let negative = 20;
-        let cleanAnalysis = fullResponse;
-
-        const sentimentRegex = /\[SENTIMENT\]:\s*positive:\s*(\d+),\s*neutral:\s*(\d+),\s*negative:\s*(\d+)/i;
-        const match = fullResponse.match(sentimentRegex);
-        if (match) {
-          positive = parseInt(match[1], 10);
-          neutral = parseInt(match[2], 10);
-          negative = parseInt(match[3], 10);
-          cleanAnalysis = fullResponse.replace(sentimentRegex, '').trim();
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (typeof content === 'string' && content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ analysisChunk: content })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+            log('info', 'ai-analysis_done', { ticker, durationMs: Date.now() - startTime });
+          } catch (err) {
+            log('error', 'ai-analysis_error', { error: (err as Error).message });
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
+            controller.close();
+          }
         }
-
-        return new Response(JSON.stringify({ 
-          analysis: cleanAnalysis,
-          sentiment: { positive, neutral, negative }
-        }), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
-      } catch (err) {
-        console.error(`[API] AI Analiz hatası (${ticker}):`, err);
-        return new Response(JSON.stringify({ error: (err as Error).message }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
-      }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     }
 
     // 1.7. API: Compare Multiple Stocks
@@ -287,7 +384,9 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
         });
       }
       try {
-        console.log(`[API] Arama yapılıyor: "${query}"`);
+        const cached = cacheGet(`search:${query}`);
+        if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+        log('info', 'search', { query });
         const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
         const searchResults = await yahooFinance.search(query, {
           quotesCount: 8,
@@ -307,6 +406,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
             };
           });
 
+        cacheSet(`search:${query}`, bistResults, 1000 * 60 * 10); // 10 mins
         return new Response(JSON.stringify(bistResults), {
           headers: {
             'Content-Type': 'application/json',
@@ -393,6 +493,8 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
     // 2.7. API: Market Summary (Top Bar)
     if (path === '/api/market-summary') {
       try {
+        const cached = cacheGet('market-summary');
+        if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
         const tickers = ['XU100.IS', 'TRY=X', 'EURTRY=X'];
         const promises = tickers.map(t => yahooFinance.quote(t).catch(() => null));
@@ -404,6 +506,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
           eurtry: results[2] ? { price: results[2].regularMarketPrice, change: results[2].regularMarketChangePercent } : null,
         };
 
+        cacheSet('market-summary', summary, 1000 * 60); // 1 minute
         return new Response(JSON.stringify(summary), {
           headers: {
             'Content-Type': 'application/json',
