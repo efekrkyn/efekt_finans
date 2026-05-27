@@ -7,6 +7,8 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as 
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
 
+const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://efekt-finans.onrender.com';
+
 const GLOSSARY = {
   pe: <><strong>F/K (Fiyat / Kazanç):</strong> Şirketin piyasa değerinin yıllık net kâra bölümü.<br/><strong>Formül:</strong> Piyasa Değeri / Net Kâr<br/><strong>Yorum:</strong> Düşük F/K genellikle ucuz, ama sektör bağımlı. BIST için &lt;10 ucuz sayılır.</>,
   pb: <><strong>PD/DD (Piyasa Değeri / Defter Değeri):</strong> Piyasanın şirkete biçtiği değer / Özsermaye.<br/><strong>Formül:</strong> Piyasa Değeri / Özsermaye<br/><strong>Yorum:</strong> &lt;1 değer altında, 1-3 normal, &gt;3 pahalı.</>,
@@ -207,7 +209,7 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'heatmap' && heatmapData.length === 0) {
       setHeatmapLoading(true);
-      fetch('/api/heatmap')
+      fetch(`${API_BASE}/api/heatmap`)
         .then(r => r.json())
         .then(d => { setHeatmapData(Array.isArray(d) ? d : []); setHeatmapLoading(false); })
         .catch(() => setHeatmapLoading(false));
@@ -220,7 +222,7 @@ export default function App() {
         setGlobalKapLoading(true);
         setGlobalKapNews('');
         try {
-          const res = await fetch('/api/kap-news', {
+          const res = await fetch(`${API_BASE}/api/kap-news`, {
             headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
           });
           const reader = res.body?.getReader();
@@ -369,7 +371,7 @@ export default function App() {
     setBacktestLoading(true);
     setBacktestError(null);
     try {
-      const res = await fetch('/api/backtest', {
+      const res = await fetch(`${API_BASE}/api/backtest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticker: backtestTicker.toUpperCase(), strategy: 'sma', years: backtestYears })
@@ -390,7 +392,7 @@ export default function App() {
     setPortfolioAnalysis('');
     setPortfolioAiError(null);
     try {
-      const res = await fetch('/api/portfolio-optimize', {
+      const res = await fetch(`${API_BASE}/api/portfolio-optimize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
         body: JSON.stringify({ portfolio })
@@ -432,7 +434,7 @@ export default function App() {
     setDividendLoading(true);
     setDividendData('');
     try {
-      const res = await fetch('/api/dividend-planner', {
+      const res = await fetch(`${API_BASE}/api/dividend-planner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
         body: JSON.stringify({ portfolio, monthlyAddition })
@@ -490,7 +492,7 @@ export default function App() {
     setMacroLoading(true);
     setMacroData('');
     try {
-      const res = await fetch('/api/macro-analysis', {
+      const res = await fetch(`${API_BASE}/api/macro-analysis`, {
         headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
       });
       const reader = res.body?.getReader();
@@ -524,7 +526,7 @@ export default function App() {
     if (!smartAlertInput.trim()) return;
     setSmartAlertLoading(true);
     try {
-      const res = await fetch('/api/alerts/parse', {
+      const res = await fetch(`${API_BASE}/api/alerts/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
         body: JSON.stringify({ query: smartAlertInput })
@@ -624,7 +626,7 @@ export default function App() {
       safeLocalStorage.removeItem('fintables-watchlist');
     }
     
-    fetch('/api/market-summary')
+    fetch(`${API_BASE}/api/market-summary`)
       .then(r => r.json())
       .then(d => setMarketSummary(d))
       .catch(e => console.error(e));
@@ -805,7 +807,7 @@ export default function App() {
                          `İzleme Listesi: ${watchlist.join(', ')}\n` +
                          `Portföy: ${portfolio.map(p => p.ticker).join(', ')}`;
 
-      const response = await fetch('http://localhost:3000/api/chat', {
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
         body: JSON.stringify({ query, sessionId, model: aiChatModel, context: contextStr })
@@ -1717,7 +1719,7 @@ export default function App() {
             <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
                 <h2 style={{fontSize:'2rem', fontWeight:800}}>BIST 30 Heatmap</h2>
-                <button onClick={() => { setHeatmapData([]); setHeatmapLoading(true); fetch('/api/heatmap').then(r=>r.json()).then(d=>{setHeatmapData(Array.isArray(d)?d:[]); setHeatmapLoading(false);}).catch(()=>setHeatmapLoading(false)); }}
+                <button onClick={() => { setHeatmapData([]); setHeatmapLoading(true); fetch(`${API_BASE}/api/heatmap`).then(r=>r.json()).then(d=>{setHeatmapData(Array.isArray(d)?d:[]); setHeatmapLoading(false);}).catch(()=>setHeatmapLoading(false)); }}
                   style={{padding:'8px 16px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'transparent', color:'var(--text-main)', cursor:'pointer'}}>
                   Yenile
                 </button>
