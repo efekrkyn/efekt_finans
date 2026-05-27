@@ -171,7 +171,7 @@ export default function App() {
       setHeatmapLoading(true);
       fetch('/api/heatmap')
         .then(r => r.json())
-        .then(d => { setHeatmapData(d); setHeatmapLoading(false); })
+        .then(d => { setHeatmapData(Array.isArray(d) ? d : []); setHeatmapLoading(false); })
         .catch(() => setHeatmapLoading(false));
     }
   }, [activeTab]);
@@ -1095,33 +1095,55 @@ export default function App() {
 
           {activeTab === 'heatmap' && (
             <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
-              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:24}}>BIST 30 Heatmap</h2>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
+                <h2 style={{fontSize:'2rem', fontWeight:800}}>BIST 30 Heatmap</h2>
+                <button onClick={() => { setHeatmapData([]); setHeatmapLoading(true); fetch('/api/heatmap').then(r=>r.json()).then(d=>{setHeatmapData(Array.isArray(d)?d:[]); setHeatmapLoading(false);}).catch(()=>setHeatmapLoading(false)); }}
+                  style={{padding:'8px 16px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'transparent', color:'var(--text-main)', cursor:'pointer'}}>
+                  Yenile
+                </button>
+              </div>
               {heatmapLoading ? (
                 <div style={{color:'var(--text-muted)', textAlign:'center', padding:40}}><Loader2 className="spinner" size={32} /> Yükleniyor...</div>
+              ) : heatmapData.length === 0 ? (
+                <div style={{color:'var(--text-muted)', textAlign:'center', padding:60}}>Veri alınamadı.</div>
               ) : (
-                <div style={{display:'flex', flexWrap:'wrap', gap:4, alignContent:'flex-start'}}>
-                  {heatmapData.map(d => {
-                    const absChange = Math.abs(d.change);
-                    // intensity 0 to 1 based on 0% to 5% change
-                    const intensity = Math.min(absChange / 5, 1);
-                    const baseColor = d.change >= 0 ? 'var(--accent-primary-rgb)' : 'var(--accent-negative-rgb)';
-                    const bg = `rgba(${baseColor}, ${0.2 + intensity * 0.8})`;
-                    const widthClass = d.marketCap > 100000000000 ? '24%' : d.marketCap > 50000000000 ? '16%' : '12%';
-                    return (
-                      <div key={d.ticker} title={d.companyName} style={{
-                        flex: `1 1 ${widthClass}`,
-                        minWidth: 80,
-                        height: 80,
-                        backgroundColor: bg,
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        color: '#fff', borderRadius: 4, cursor: 'pointer', border: '1px solid var(--glass-border)'
-                      }}>
-                        <div style={{fontWeight:800, fontSize:'1rem'}}>{d.ticker}</div>
-                        <div style={{fontSize:'0.8rem', fontWeight:600}}>{d.change > 0 ? '+' : ''}{d.change.toFixed(2)}%</div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <>
+                  <div style={{display:'flex', flexWrap:'wrap', gap:4, alignContent:'flex-start'}}>
+                    {[...heatmapData].sort((a,b) => (b.marketCap || 0) - (a.marketCap || 0)).map(d => {
+                      const absChange = Math.abs(d.change);
+                      const intensity = Math.min(absChange / 5, 1);
+                      const baseColor = d.change >= 0 ? 'var(--accent-primary-rgb)' : 'var(--accent-negative-rgb)';
+                      const bg = `rgba(${baseColor}, ${0.2 + intensity * 0.8})`;
+                      const widthClass = d.marketCap > 100000000000 ? '24%' : d.marketCap > 50000000000 ? '16%' : '12%';
+                      return (
+                        <div key={d.ticker} 
+                          title={`${d.companyName} — tıkla detay aç`}
+                          onClick={() => loadStock(d.ticker)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadStock(d.ticker); } }}
+                          style={{
+                            flex: `1 1 ${widthClass}`,
+                            minWidth: 80,
+                            height: 80,
+                            backgroundColor: bg,
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', borderRadius: 4, cursor: 'pointer', border: '1px solid var(--glass-border)',
+                            transition: 'transform 0.15s, box-shadow 0.15s',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.5)'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)'; e.currentTarget.style.zIndex = '10'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.zIndex = '1'; }}>
+                          <div style={{fontWeight:800, fontSize:'1rem'}}>{d.ticker}</div>
+                          <div style={{fontSize:'0.8rem', fontWeight:600}}>{d.change > 0 ? '+' : ''}{d.change.toFixed(2)}%</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{marginTop:24, padding:16, backgroundColor:'var(--bg-card)', borderRadius:8, fontSize:'0.85rem', color:'var(--text-muted)'}}>
+                    💡 Kutu boyutu piyasa değerini, renk yoğunluğu günlük değişim büyüklüğünü temsil eder. Bir kutuya tıklayınca o hissenin analizi açılır.
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -1629,7 +1651,9 @@ export default function App() {
                     </div>
                   )}
                 </section>
-              )}\n\n              {activeTab === 'charts' && (
+              )}
+
+              {activeTab === 'charts' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
