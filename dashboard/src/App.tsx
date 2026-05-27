@@ -4,6 +4,18 @@ import {
   ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
+import { InfoTooltip } from './InfoTooltip';
+
+const GLOSSARY = {
+  pe: <><strong>F/K (Fiyat / Kazanç):</strong> Şirketin piyasa değerinin yıllık net kâra bölümü.<br/><strong>Formül:</strong> Piyasa Değeri / Net Kâr<br/><strong>Yorum:</strong> Düşük F/K genellikle ucuz, ama sektör bağımlı. BIST için &lt;10 ucuz sayılır.</>,
+  pb: <><strong>PD/DD (Piyasa Değeri / Defter Değeri):</strong> Piyasanın şirkete biçtiği değer / Özsermaye.<br/><strong>Formül:</strong> Piyasa Değeri / Özsermaye<br/><strong>Yorum:</strong> &lt;1 değer altında, 1-3 normal, &gt;3 pahalı.</>,
+  evEbitda: <><strong>FD/FAVÖK:</strong> Firma Değeri / Faiz, Amortisman, Vergi Öncesi Kâr.<br/><strong>Yorum:</strong> Borçlu şirketleri F/K'dan daha iyi karşılaştırır. &lt;6 cazip.</>,
+  ebitda: <><strong>FAVÖK (EBITDA):</strong> Şirketin asıl operasyonundan gelen kâr.<br/><strong>Formül:</strong> Net Kâr + Faiz + Vergi + Amortisman<br/><strong>Yorum:</strong> Şirketler arası operasyonel verimlilik karşılaştırması.</>,
+  marketCap: <><strong>Piyasa Değeri:</strong> Şirketin tüm hisselerinin toplam değeri.<br/><strong>Formül:</strong> Hisse Fiyatı × Çıkarılmış Hisse Sayısı</>,
+  rsi: <><strong>RSI (Relative Strength Index):</strong> Son 14 günün momentum göstergesi (0-100).<br/><strong>Yorum:</strong> &gt;70 aşırı alım (satış sinyali), &lt;30 aşırı satım (alış sinyali).</>,
+  macd: <><strong>MACD:</strong> 12-26 günlük EMA'ların farkı. Trend dönüşü tespiti.<br/><strong>Yorum:</strong> Sinyal çizgisini yukarı keserse alış, aşağı keserse satış.</>,
+  sma: <><strong>SMA (Simple Moving Average):</strong> Belirli gün sayısının basit ortalaması.<br/><strong>Yorum:</strong> Fiyat SMA20 üstündeyse kısa vadeli yükseliş trendi.</>,
+};
 
 function ClickableCard({ onActivate, ariaLabel, children, ...rest }: any) {
   return (
@@ -1249,19 +1261,19 @@ export default function App() {
                     <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{data.currentPrice} {data.currency}</div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>Piyasa Değeri</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px', display:'flex', alignItems:'center' }}>Piyasa Değeri <InfoTooltip content={GLOSSARY.marketCap} /></div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatMoney(data.marketCap)}</div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>F/K</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px', display:'flex', alignItems:'center' }}>F/K <InfoTooltip content={GLOSSARY.pe} /></div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{data.trailingPE ? data.trailingPE.toFixed(2) : '-'}</div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>PD/DD</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px', display:'flex', alignItems:'center' }}>PD/DD <InfoTooltip content={GLOSSARY.pb} /></div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{data.priceToBook ? data.priceToBook.toFixed(2) : '-'}</div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px' }}>FD/FAVÖK</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '4px', display:'flex', alignItems:'center' }}>FD/FAVÖK <InfoTooltip content={GLOSSARY.evEbitda} /></div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{data.evToEbitda ? data.evToEbitda.toFixed(2) : '-'}</div>
                   </div>
                 </div>
@@ -1361,16 +1373,16 @@ export default function App() {
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>RSI (14) Göstergesi</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>RSI (14) Göstergesi <InfoTooltip content={GLOSSARY.rsi} /></div>
                       <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>41.7 <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>(NÖTR)</span></div>
                     </div>
                     <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Hareketli Ortalamalar</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px' }}>SMA (20): <span style={{ color: '#fff' }}>{(data.currentPrice * 1.02).toFixed(2)} ₺</span></div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px', display:'flex', alignItems:'center' }}>SMA (20) <InfoTooltip content={GLOSSARY.sma} />: <span style={{ color: '#fff', marginLeft:4 }}>{(data.currentPrice * 1.02).toFixed(2)} ₺</span></div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>SMA (50): <span style={{ color: '#fff' }}>{(data.currentPrice * 1.05).toFixed(2)} ₺</span></div>
                     </div>
                     <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>MACD Göstergesi (12, 26, 9)</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>MACD Göstergesi (12, 26, 9) <InfoTooltip content={GLOSSARY.macd} /></div>
                       <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--accent-negative)' }}>Hist: -15.398</div>
                     </div>
                     <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1422,7 +1434,7 @@ export default function App() {
                         ))}
                       </tr>
                       <tr>
-                        <td style={{ padding: '16px', fontWeight: 600 }}>FAVÖK (EBITDA)</td>
+                        <td style={{ padding: '16px', fontWeight: 600, display:'flex', alignItems:'center' }}>FAVÖK (EBITDA) <InfoTooltip content={GLOSSARY.ebitda} /></td>
                         {(activeTab === 'quarterly' ? data.quarterly : data.annual).slice().reverse().map(p => (
                           <td key={p.date} style={{ padding: '16px', textAlign: 'right' }}>{formatMoney(p.ebitda)}</td>
                         ))}
