@@ -64,6 +64,15 @@ interface MarketSummary {
   eurtry?: {price?:number;change?:number}|null; 
 }
 
+interface TechnicalIndicators {
+  rsi?: number;
+  macd?: { macdLine: number; signalLine: number; histogram: number; };
+  sma20?: number;
+  sma50?: number;
+  signal: 'AL' | 'SAT' | 'NÖTR';
+  rsiSignal: 'AŞIRI ALIM' | 'AŞIRI SATIM' | 'NÖTR';
+}
+
 interface AnalysisResult {
   ticker: string;
   companyName: string;
@@ -76,6 +85,7 @@ interface AnalysisResult {
   quarterly: PeriodData[];
   annual: PeriodData[];
   scorecard: Scorecard;
+  technicalIndicators?: TechnicalIndicators;
 }
 
 function getSessionId() {
@@ -1527,34 +1537,38 @@ export default function App() {
                 )}
 
                 {/* Teknik Analiz Göstergeleri (Mock) */}
-                <div style={{ marginTop: '32px' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Activity size={20} color="var(--accent-primary)" />
-                    Teknik Analiz Göstergeleri <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span>
-                  </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>RSI (14) Göstergesi <InfoTooltip content={GLOSSARY.rsi} /></div>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>41.7 <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>(NÖTR)</span></div>
-                    </div>
-                    <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Hareketli Ortalamalar</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px', display:'flex', alignItems:'center' }}>SMA (20) <InfoTooltip content={GLOSSARY.sma} />: <span style={{ color: 'var(--text-main)', marginLeft:4 }}>{(data.currentPrice * 1.02).toFixed(2)} ₺</span></div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>SMA (50): <span style={{ color: 'var(--text-main)' }}>{(data.currentPrice * 1.05).toFixed(2)} ₺</span></div>
-                    </div>
-                    <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>MACD Göstergesi (12, 26, 9) <InfoTooltip content={GLOSSARY.macd} /></div>
-                      <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--accent-negative)' }}>Hist: -15.398</div>
-                    </div>
-                    <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Teknik Sinyal</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>Karar Durumu</div>
+                {data.technicalIndicators && (
+                  <div style={{ marginTop: '32px' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Activity size={20} color="var(--accent-primary)" />
+                      Teknik Analiz Göstergeleri
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>RSI (14) Göstergesi <InfoTooltip content={GLOSSARY.rsi} /></div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>
+                          {data.technicalIndicators.rsi ? data.technicalIndicators.rsi.toFixed(1) : '-'} <span style={{ fontSize: '1rem', fontWeight: 500, color: data.technicalIndicators.rsiSignal === 'AŞIRI ALIM' ? 'var(--accent-negative)' : data.technicalIndicators.rsiSignal === 'AŞIRI SATIM' ? 'var(--accent-primary)' : 'var(--text-muted)' }}>({data.technicalIndicators.rsiSignal})</span>
+                        </div>
                       </div>
-                      <div style={{ backgroundColor: 'var(--accent-negative)', color: 'var(--text-main)', padding: '8px 24px', borderRadius: '24px', fontWeight: 800 }}>SAT</div>
+                      <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Hareketli Ortalamalar</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px', display:'flex', alignItems:'center' }}>SMA (20) <InfoTooltip content={GLOSSARY.sma} />: <span style={{ color: 'var(--text-main)', marginLeft:4 }}>{data.technicalIndicators.sma20 ? data.technicalIndicators.sma20.toFixed(2) : '-'} ₺</span></div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>SMA (50): <span style={{ color: 'var(--text-main)' }}>{data.technicalIndicators.sma50 ? data.technicalIndicators.sma50.toFixed(2) : '-'} ₺</span></div>
+                      </div>
+                      <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>MACD Göstergesi (12, 26, 9) <InfoTooltip content={GLOSSARY.macd} /></div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 700, color: data.technicalIndicators.macd && data.technicalIndicators.macd.histogram > 0 ? 'var(--accent-primary)' : 'var(--accent-negative)' }}>Hist: {data.technicalIndicators.macd ? data.technicalIndicators.macd.histogram.toFixed(3) : '-'}</div>
+                      </div>
+                      <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Teknik Sinyal</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>Karar Durumu</div>
+                        </div>
+                        <div style={{ backgroundColor: data.technicalIndicators.signal === 'AL' ? 'var(--accent-primary)' : data.technicalIndicators.signal === 'SAT' ? 'var(--accent-negative)' : 'var(--glass-border)', color: 'var(--text-main)', padding: '8px 24px', borderRadius: '24px', fontWeight: 800 }}>{data.technicalIndicators.signal}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
               </section>
 
