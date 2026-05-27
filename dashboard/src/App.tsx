@@ -654,7 +654,8 @@ export default function App() {
     return new Intl.NumberFormat('tr-TR').format(n) + ' ₺';
   };
 
-  const parseMarkdown = (text: string) => {
+  const parseMarkdown = (text: string | null) => {
+    if (!text) return null;
     return text.split('\n').map((line, i) => {
       if (line.startsWith('# ')) return <h1 key={i} style={{fontSize:'1.5rem', fontWeight:800, margin:'1rem 0'}}>{parseInlineMarkdown(line.slice(2))}</h1>;
       if (line.startsWith('## ')) return <h2 key={i} style={{fontSize:'1.3rem', fontWeight:700, margin:'1rem 0'}}>{parseInlineMarkdown(line.slice(3))}</h2>;
