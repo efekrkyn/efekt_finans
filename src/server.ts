@@ -938,11 +938,12 @@ Raporu Markdown formatında hazırla. Özellikle şunlara değin:
         async start(controller) {
           const encoder = new TextEncoder();
           try {
-            const query = `Türkiye makroekonomi güncel enflasyon TCMB faiz kararı dolar kuru beklentileri borsa istanbul etkisi`;
+            const currentDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+            const query = `Türkiye makroekonomi ${currentDate} güncel enflasyon TCMB faiz kararı dolar kuru beklentileri borsa istanbul etkisi`;
             log('info', 'tavily_search', { query });
             const searchResults = await searchTavily(query);
             
-            const prompt = `Aşağıda Türkiye ekonomisi ve TCMB faiz kararlarıyla ilgili güncel haber ve veriler var:\n\n${searchResults}\n\nSen uzman bir makroekonomist ve fon yöneticisisin. "Makroekonomi & Merkez Bankası Raporu" başlığı altında, güncel enflasyon, faiz oranları ve döviz kuru durumunu analiz et. Borsa İstanbul'daki farklı sektörlere (Bankacılık, Sanayi, İhracatçılar vb.) olası etkilerini maddeler halinde açıkla. Raporu okunaklı bir Markdown formatında yaz.`;
+            const prompt = `Bugünün tarihi: ${currentDate}. Aşağıda Türkiye ekonomisi ve TCMB faiz kararlarıyla ilgili en güncel haber ve veriler var:\n\n${searchResults}\n\nSen uzman bir makroekonomist ve fon yöneticisisin. "Makroekonomi & Merkez Bankası Raporu (${currentDate})" başlığı altında, güncel enflasyon, faiz oranları ve döviz kuru durumunu analiz et. Borsa İstanbul'daki farklı sektörlere (Bankacılık, Sanayi, İhracatçılar vb.) olası etkilerini maddeler halinde açıkla. Lütfen raporda tarihin ${currentDate} olduğunu belirt ve eski ayların (örneğin Mart) verilerini geçmiş veriler olarak değerlendirip, odak noktanı tam olarak içinde bulunduğumuz ${currentDate} dönemine ve beklentilerine ver. Raporu okunaklı bir Markdown formatında yaz.`;
             
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir makroekonomistsin.'),
@@ -1093,8 +1094,9 @@ Markdown formatında hazırla.
       return new Response(new ReadableStream({
         async start(controller) {
           try {
-            const body = await req.json() as { query?: string, sessionId?: string, model?: string };
+            const body = await req.json() as { query?: string, sessionId?: string, model?: string, context?: string };
             const query = body.query;
+            const contextStr = body.context;
             const sessionId = body.sessionId || 'default';
             const selectedModel = body.model || 'deepseek-v4-pro';
             if (!query) {
@@ -1102,6 +1104,8 @@ Markdown formatında hazırla.
               controller.close();
               return;
             }
+
+            const finalQuery = contextStr ? `[EK BİLGİ - Kullanıcının Ekranındaki Veriler:\n${contextStr}]\n\nKullanıcı Sorusu: ${query}` : query;
 
             if (!chatSessions[sessionId]) {
               chatSessions[sessionId] = new InMemoryChatHistory(selectedModel, 15);
@@ -1115,7 +1119,7 @@ Markdown formatında hazırla.
             });
             let fullAnswer = '';
 
-            for await (const event of agent.run(query, history)) {
+            for await (const event of agent.run(finalQuery, history)) {
               if (event.type === 'thinking') {
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'thinking', message: event.message })}\n\n`));
               } else if (event.type === 'tool_start') {

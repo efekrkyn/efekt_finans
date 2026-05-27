@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Draggable from 'react-draggable';
 import { 
   Search, ArrowUpRight, ArrowDownRight, Activity, DollarSign, TrendingUp, Download, Check, AlertCircle, Info, PieChart, Briefcase, ChevronDown, 
-  ChevronRight, BarChart, Bell, BellRing, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2 } from 'lucide-react';
+  ChevronRight, BarChart, Bell, BellRing, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2, X } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
@@ -167,6 +168,7 @@ export default function App() {
 
   // AI Assistant State
   const [aiChatModel, setAiChatModel] = useState('deepseek-v4-pro');
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantMessages, setAssistantMessages] = useState<{role: 'user'|'assistant'|'system', content: string}[]>([
     { role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }
   ]);
@@ -793,10 +795,20 @@ export default function App() {
     setAssistantMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
+      const contextStr = `Mevcut Ekran: ${activeTab === 'quarterly' ? data?.ticker + ' Hisse Detayı' : activeTab}\n` + 
+                         (data ? `Açık Hisse Verisi: ${JSON.stringify({
+                            ticker: data.ticker, 
+                            fiyat: data.price,
+                            piyasaDegeri: data.marketCap,
+                            bilancoPuanlari: data.scores
+                         })}\n` : '') +
+                         `İzleme Listesi: ${watchlist.join(', ')}\n` +
+                         `Portföy: ${portfolio.map(p => p.ticker).join(', ')}`;
+
       const response = await fetch('http://localhost:3000/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, sessionId, model: aiChatModel })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        body: JSON.stringify({ query, sessionId, model: aiChatModel, context: contextStr })
       });
 
       if (!response.body) throw new Error('No body');
@@ -1028,10 +1040,10 @@ export default function App() {
           </button>
         </div>
 
-        <nav style={{ flex: 1, padding: '0 12px' }}>
+        <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }}>
           {[
-            { id: 'dashboard', label: 'Piyasalar', icon: LayoutGrid, active: !data && activeTab !== 'fund' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'kap' },
-            { id: 'stocks', label: 'Hisseler', icon: BarChart, active: !!data && activeTab !== 'fund' && activeTab !== 'backtest' && activeTab !== 'kap' },
+            { id: 'dashboard', label: 'Piyasalar', icon: LayoutGrid, active: !data && activeTab !== 'fund' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'kap' && activeTab !== 'alerts' && activeTab !== 'macro' },
+            { id: 'stocks', label: 'Hisseler', icon: BarChart, active: !!data && activeTab !== 'fund' && activeTab !== 'backtest' && activeTab !== 'kap' && activeTab !== 'alerts' && activeTab !== 'macro' },
             { id: 'watchlist', label: 'İzleme Listesi', icon: List, active: activeTab === 'watchlist' },
             { id: 'portfolio', label: 'Portföyüm', icon: Briefcase, active: activeTab === 'portfolio' },
             { id: 'backtest', label: 'Backtest', icon: Activity, active: activeTab === 'backtest' },
@@ -1041,8 +1053,7 @@ export default function App() {
             { id: 'screener', label: 'Tarayıcı', icon: Search, active: activeTab === 'screener' },
             { id: 'global', label: 'Global', icon: TrendingUp, active: activeTab === 'global' },
             { id: 'macro', label: 'Makro Analiz', icon: BrainCircuit, active: activeTab === 'macro' },
-            { id: 'heatmap', label: 'Heatmap', icon: LayoutGrid, active: activeTab === 'heatmap' },
-            { id: 'assistant', label: 'AI Asistan', icon: MessageSquare, active: activeTab === 'assistant' }
+            { id: 'heatmap', label: 'Heatmap', icon: LayoutGrid, active: activeTab === 'heatmap' }
           ].map(item => (
             <ClickableCard 
               key={item.id}
@@ -1052,12 +1063,13 @@ export default function App() {
                 if (item.id === 'watchlist') { setActiveTab('watchlist'); }
                 if (item.id === 'portfolio') { setActiveTab('portfolio'); }
                 if (item.id === 'backtest') { setData(null); setActiveTab('backtest'); }
+                if (item.id === 'alerts') { setData(null); setActiveTab('alerts'); }
                 if (item.id === 'kap') { setData(null); setActiveTab('kap'); }
                 if (item.id === 'agenda') { setActiveTab('agenda'); }
                 if (item.id === 'screener') { setData(null); setActiveTab('screener'); }
                 if (item.id === 'global') { setData(null); setActiveTab('global'); }
+                if (item.id === 'macro') { setData(null); setActiveTab('macro'); }
                 if (item.id === 'heatmap') { setData(null); setActiveTab('heatmap'); }
-                if (item.id === 'assistant') { setData(null); setActiveTab('assistant'); }
                 if (isMobile) setSidebarOpen(false);
               }}
               ariaLabel={item.label}
@@ -1630,14 +1642,25 @@ export default function App() {
                 <h2 style={{ fontSize: '2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 12 }}>
                   <BrainCircuit size={32} color="var(--accent-primary)" /> Makroekonomi & Merkez Bankası (AI Analizi)
                 </h2>
-                <button 
-                  onClick={runMacroAnalysis}
-                  disabled={macroLoading}
-                  style={{ padding: '12px 24px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: macroLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'opacity 0.2s' }}
-                >
-                  {macroLoading ? <Loader2 className="spinner" size={20} /> : <Sparkles size={20} />}
-                  {macroLoading ? 'Rapor Hazırlanıyor...' : 'Güncel Rapor Üret'}
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  {macroData && (
+                    <button 
+                      onClick={() => window.print()}
+                      style={{ padding: '12px 24px', backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      <Download size={20} />
+                      PDF İndir
+                    </button>
+                  )}
+                  <button 
+                    onClick={runMacroAnalysis}
+                    disabled={macroLoading}
+                    style={{ padding: '12px 24px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: macroLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'opacity 0.2s' }}
+                  >
+                    {macroLoading ? <Loader2 className="spinner" size={20} /> : <Sparkles size={20} />}
+                    {macroLoading ? 'Rapor Hazırlanıyor...' : 'Güncel Rapor Üret'}
+                  </button>
+                </div>
               </div>
 
               {!macroData && !macroLoading && (
@@ -1824,69 +1847,7 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'assistant' && (
-            <div className="animated-fade-in" style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', maxWidth: '900px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                  <MessageSquare size={24} color="var(--accent-primary)" /> AI Finansal Asistan
-                </h2>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <select
-                    value={aiChatModel}
-                    onChange={(e) => setAiChatModel(e.target.value)}
-                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 12px', borderRadius: '8px', outline: 'none', cursor: 'pointer' }}
-                  >
-                    <option value="deepseek-v4-pro">DeepSeek V4 Pro (Düşünen)</option>
-                    <option value="deepseek-v4-flash">DeepSeek V4 Flash (Hızlı)</option>
-                  </select>
-                  <button 
-                    onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }])}
-                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
-                  >
-                    Geçmişi Temizle
-                  </button>
-                </div>
-              </div>
-              
-              <div ref={scrollRef} style={{ flex: 1, backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '16px' }}>
-                {assistantMessages.map((msg, i) => (
-                  <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.02)', color: msg.role === 'user' ? '#000' : 'var(--text-main)', padding: '20px', borderRadius: '12px', border: msg.role === 'user' ? 'none' : '1px solid var(--glass-border)' }}>
-                    {msg.role !== 'user' && msg.role !== 'system' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--accent-primary)' }}>
-                        <Activity size={16} /> <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>Efekt AI</span>
-                      </div>
-                    )}
-                    <div style={{ lineHeight: '1.6', fontSize: '1.05rem', overflowX: 'auto' }}>
-                      {msg.role === 'user' ? msg.content : parseMarkdown(msg.content)}
-                    </div>
-                  </div>
-                ))}
-                {isAssistantTyping && assistantStatus && (
-                  <div style={{ alignSelf: 'flex-start', color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                    <Loader2 className="spinner" size={16} /> {assistantStatus}
-                  </div>
-                )}
-              </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <input 
-                  type="text" 
-                  value={assistantInput}
-                  onChange={(e) => setAssistantInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAssistantSend()}
-                  placeholder="Hisse analizi iste, piyasa durumu sor, fon oluştur..." 
-                  style={{ flex: 1, padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1rem', outline: 'none' }}
-                />
-                <button 
-                  onClick={handleAssistantSend}
-                  disabled={isAssistantTyping || !assistantInput.trim()}
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '12px', padding: '0 32px', fontWeight: 800, fontSize: '1.05rem', cursor: isAssistantTyping ? 'not-allowed' : 'pointer', opacity: isAssistantTyping ? 0.7 : 1 }}
-                >
-                  Gönder
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* FUND CREATOR VIEW */}
           {activeTab === 'fund' && (
@@ -2385,6 +2346,119 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* FLOATING AI ASSISTANT WIDGET */}
+      <Draggable bounds="body" handle=".drag-handle">
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: '16px'
+        }}>
+          {isAssistantOpen && (
+            <div className="animated-fade-in" style={{
+              width: isMobile ? 'calc(100vw - 48px)' : '400px',
+              height: isMobile ? 'calc(100vh - 120px)' : '600px',
+              backgroundColor: 'var(--bg-secondary)', // Solid dark background to prevent text overlapping
+              border: '1px solid var(--glass-border)',
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
+              {/* Header (Draggable) */}
+              <div className="drag-handle" style={{ padding: '16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', cursor: 'grab' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={20} color="var(--accent-primary)" />
+                  <span style={{ fontWeight: 800 }}>Efekt AI</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <select
+                    value={aiChatModel}
+                    onChange={(e) => setAiChatModel(e.target.value)}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '4px 8px', borderRadius: '6px', outline: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
+                  >
+                    <option value="deepseek-v4-pro">Pro</option>
+                    <option value="deepseek-v4-flash">Fast</option>
+                  </select>
+                  <button onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Efekt AI. Şu an bulunduğun sayfadaki hisseleri ve verileri görüyorum. Nasıl yardımcı olabilirim?' }])} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }} title="Sohbeti Temizle">
+                    <Loader2 size={16} />
+                  </button>
+                  <button onClick={() => setIsAssistantOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat Area */}
+              <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {assistantMessages.map((msg, i) => (
+                  <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', color: msg.role === 'user' ? '#000' : 'var(--text-main)', padding: '12px 16px', borderRadius: '12px', border: msg.role === 'user' ? 'none' : '1px solid var(--glass-border)', fontSize: '0.95rem' }}>
+                    {msg.role !== 'user' && msg.role !== 'system' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 800 }}>
+                        <Activity size={12} /> Efekt AI
+                      </div>
+                    )}
+                    <div style={{ lineHeight: '1.5', overflowX: 'auto' }}>
+                      {msg.role === 'user' ? msg.content : parseMarkdown(msg.content)}
+                    </div>
+                  </div>
+                ))}
+                {isAssistantTyping && assistantStatus && (
+                  <div style={{ alignSelf: 'flex-start', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                    <Loader2 className="spinner" size={14} /> {assistantStatus}
+                  </div>
+                )}
+              </div>
+
+              {/* Input Area */}
+              <div style={{ padding: '16px', borderTop: '1px solid var(--glass-border)', display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  value={assistantInput}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAssistantSend()}
+                  placeholder="Bana bir şey sor..." 
+                  style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.95rem', outline: 'none' }}
+                />
+                <button 
+                  onClick={handleAssistantSend}
+                  disabled={isAssistantTyping || !assistantInput.trim()}
+                  style={{ backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', padding: '0 16px', fontWeight: 800, cursor: isAssistantTyping ? 'not-allowed' : 'pointer', opacity: isAssistantTyping ? 0.7 : 1 }}
+                >
+                  <ArrowUpRight size={20} />
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <button
+            onClick={() => setIsAssistantOpen(prev => !prev)}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--accent-primary)',
+              color: '#000',
+              border: 'none',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.2s',
+              transform: isAssistantOpen ? 'scale(0.9)' : 'scale(1)'
+            }}
+          >
+            {isAssistantOpen ? <X size={32} /> : <Sparkles size={32} />}
+          </button>
+        </div>
+      </Draggable>
     </div>
   );
 }
