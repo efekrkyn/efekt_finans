@@ -29,6 +29,33 @@
   color-scheme: dark;
 }
 
+:root[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  --bg-main: #f1f5f9;
+  --bg-card: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-shadow: rgba(0, 0, 0, 0.1);
+  
+  --accent-primary: #059669;
+  --accent-negative: #dc2626;
+  --accent-neutral: #475569;
+  
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-dark: #94a3b8;
+  
+  color-scheme: light;
+}
+
+:root[data-theme="light"] body {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(5, 150, 105, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(220, 38, 38, 0.03) 0%, transparent 40%);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

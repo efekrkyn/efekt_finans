@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, Activity, Loader2, Briefcase, TrendingUp,
-  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu } from 'lucide-react';
+  ChevronRight, BarChart, Bell, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
@@ -86,6 +86,29 @@ function getSessionId() {
 const sessionId = getSessionId();
 
 export default function App() {
+  const [theme, setTheme] = useState<'dark'|'light'|'system'>(() => {
+    return (localStorage.getItem('dexter-theme') as any) || 'dark';
+  });
+
+  useEffect(() => {
+    const apply = () => {
+      let effective: 'dark'|'light' = 'dark';
+      if (theme === 'system') {
+        effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } else {
+        effective = theme;
+      }
+      document.documentElement.setAttribute('data-theme', effective);
+    };
+    apply();
+    localStorage.setItem('dexter-theme', theme);
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', apply);
+      return () => mq.removeEventListener('change', apply);
+    }
+  }, [theme]);
+
   const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
@@ -635,7 +658,7 @@ export default function App() {
       
       {/* LEFT SIDEBAR */}
       <aside style={{ width: '260px', backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', position: isMobile ? 'fixed' : 'static', top: 0, left: 0, height: '100vh', zIndex: 200, transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.3s ease' }}>
-        <div style={{ padding: '24px', fontSize: '1.5rem', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ padding: '24px', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Activity color="var(--accent-primary)" />
           Dexter
         </div>
@@ -672,7 +695,7 @@ export default function App() {
                 if (isMobile) setSidebarOpen(false);
               }}
               ariaLabel={item.label}
-              style={{ padding: '12px 16px', margin: '4px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: item.active ? '#fff' : 'var(--text-muted)', backgroundColor: item.active ? 'rgba(255,255,255,0.05)' : 'transparent', cursor: 'pointer', fontWeight: item.active ? 600 : 400 }}
+              style={{ padding: '12px 16px', margin: '4px 0', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: item.active ? 'var(--text-main)' : 'var(--text-muted)', backgroundColor: item.active ? 'rgba(255,255,255,0.05)' : 'transparent', cursor: 'pointer', fontWeight: item.active ? 600 : 400 }}
             >
               <item.icon size={20} color={item.active ? 'var(--accent-primary)' : 'currentColor'} />
               {item.label}
@@ -688,7 +711,7 @@ export default function App() {
         {activeTab !== 'assistant' && (
         <header style={{ height: '70px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', padding: '0 24px', backgroundColor: 'var(--bg-card)', gap: '24px' }}>
           {isMobile && (
-            <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" style={{background:'none', border:'none', color:'#fff', cursor:'pointer', padding:8, marginRight:16}}>
+            <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" style={{background:'none', border:'none', color:'var(--text-main)', cursor:'pointer', padding:8, marginRight:16}}>
               <Menu size={24} />
             </button>
           )}
@@ -698,7 +721,7 @@ export default function App() {
               value={tickerInput}
               onChange={handleSearch}
               placeholder="Hisse sembolü veya adıyla ara..." 
-              style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.95rem', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.95rem', outline: 'none' }}
             />
             {searchResults.length > 0 && (
               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '8px', marginTop: '8px', zIndex: 50, maxHeight: '300px', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
@@ -709,7 +732,7 @@ export default function App() {
                     ariaLabel={`${res.ticker} hissesine git`}
                     style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}
                   >
-                    <strong style={{ color: '#fff' }}>{res.ticker}</strong>
+                    <strong style={{ color: 'var(--text-main)' }}>{res.ticker}</strong>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{res.name}</span>
                   </ClickableCard>
                 ))}
@@ -738,7 +761,7 @@ export default function App() {
                 style={{position:'relative', background:'none', border:'none', color:'inherit', cursor:'pointer', padding:0}}>
                 <Bell size={20} />
                 {(alerts.length + triggeredAlerts.length) > 0 && (
-                  <span style={{position:'absolute', top:-4, right:-4, backgroundColor:'var(--accent-negative)', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <span style={{position:'absolute', top:-4, right:-4, backgroundColor:'var(--accent-negative)', color:'var(--text-main)', fontSize:10, fontWeight:700, borderRadius:'50%', width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center'}}>
                     {alerts.length + triggeredAlerts.length}
                   </span>
                 )}
@@ -782,11 +805,11 @@ export default function App() {
               const isPos = change > 0;
               return (
                 <div key={key} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#999', textTransform: 'uppercase', fontWeight: 700 }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
                     {key === 'xu100' ? 'XU100' : key === 'usdtry' ? 'USDTRY' : 'EURTRY'}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 700 }}>
-                    <span style={{ color: '#fff' }}>{key === 'xu100' ? price.toFixed(2) : price.toFixed(4)}</span>
+                    <span style={{ color: 'var(--text-main)' }}>{key === 'xu100' ? price.toFixed(2) : price.toFixed(4)}</span>
                     <span style={{ color: isPos ? 'var(--accent-primary)' : 'var(--accent-negative)', fontSize: '0.85rem' }}>
                       {isPos ? '+' : ''}{change.toFixed(2)}%
                     </span>
@@ -800,6 +823,22 @@ export default function App() {
           
           <div style={{ display: 'flex', gap: '16px', color: 'var(--text-muted)' }}>
             <button aria-label="Bildirimler" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}><Bell size={20} /></button>
+            <div style={{display:'flex', backgroundColor:'rgba(255,255,255,0.05)', borderRadius:8, padding:2}}>
+              {([
+                {val:'light', icon:Sun, label:'Açık'},
+                {val:'dark', icon:Moon, label:'Koyu'},
+                {val:'system', icon:Monitor, label:'Sistem'}
+              ] as const).map(opt => (
+                <button key={opt.val} onClick={() => setTheme(opt.val)} aria-label={opt.label}
+                  title={opt.label}
+                  style={{padding:6, borderRadius:6, border:'none',
+                    backgroundColor: theme === opt.val ? 'var(--accent-primary)' : 'transparent',
+                    color: theme === opt.val ? '#000' : 'var(--text-muted)',
+                    cursor:'pointer', display:'flex', alignItems:'center'}}>
+                  <opt.icon size={14} />
+                </button>
+              ))}
+            </div>
             <button aria-label="Kullanıcı Profili" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}><User size={20} /></button>
           </div>
         </header>
@@ -846,7 +885,7 @@ export default function App() {
                       onMouseEnter={(e: any) => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
                       onMouseLeave={(e: any) => e.currentTarget.style.borderColor = 'var(--glass-border)'}
                     >
-                      <h3 style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '8px', fontWeight: 800 }}>{idx}</h3>
+                      <h3 style={{ fontSize: '1.2rem', color: 'var(--text-main)', marginBottom: '8px', fontWeight: 800 }}>{idx}</h3>
                       <div style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: 600 }}>Analiz <ChevronRight size={14} style={{ verticalAlign: 'middle' }}/></div>
                     </ClickableCard>
                   ))}
@@ -867,9 +906,9 @@ export default function App() {
                       key={idx} 
                       onActivate={() => loadStock(idx)}
                       ariaLabel={`${idx} hisse detayları`}
-                      style={{ padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, color: '#fff', backgroundColor: 'rgba(255,255,255,0.02)', textAlign: 'center', transition: 'background-color 0.2s' }}
+                      style={{ padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)', backgroundColor: 'rgba(255,255,255,0.02)', textAlign: 'center', transition: 'background-color 0.2s' }}
                       onMouseEnter={(e: any) => { e.currentTarget.style.backgroundColor = 'var(--accent-primary)'; e.currentTarget.style.color = '#000'; }}
-                      onMouseLeave={(e: any) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={(e: any) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-main)'; }}
                     >
                       {idx}
                     </ClickableCard>
@@ -880,10 +919,10 @@ export default function App() {
                   <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} color="var(--accent-primary)"/> Yaklaşan Ajanda <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>TUPRS - Bilanço</span><span style={{ fontWeight: 600, color: '#fff' }}>Yarın</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>THYAO - Yatırımcı Sunumu</span><span style={{ fontWeight: 600, color: '#fff' }}>12 Mayıs</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>KCHOL - Temettü (4.5 ₺)</span><span style={{ fontWeight: 600, color: '#fff' }}>15 Mayıs</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>ASELS - Bilanço</span><span style={{ fontWeight: 600, color: '#fff' }}>20 Mayıs</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>TUPRS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Yarın</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>THYAO - Yatırımcı Sunumu</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>12 Mayıs</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>KCHOL - Temettü (4.5 ₺)</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>15 Mayıs</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>ASELS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>20 Mayıs</span></div>
                     </div>
                   </div>
                   <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
@@ -970,7 +1009,7 @@ export default function App() {
                             {ticker.substring(0,2)}
                           </div>
                           <div>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#fff' }}>{ticker}</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-main)' }}>{ticker}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>BIST Yıldız</div>
                           </div>
                         </div>
@@ -998,7 +1037,7 @@ export default function App() {
                   ].map((item, i) => (
                     <div key={i} style={{ display: 'flex', gap: '24px', paddingBottom: '16px', borderBottom: i === 3 ? 'none' : '1px solid var(--glass-border)' }}>
                       <div style={{ fontWeight: 700, color: 'var(--accent-primary)', width: '150px' }}>{item.date}</div>
-                      <div style={{ color: '#fff' }}>{item.event}</div>
+                      <div style={{ color: 'var(--text-main)' }}>{item.event}</div>
                     </div>
                   ))}
                 </div>
@@ -1023,7 +1062,7 @@ export default function App() {
                         const isPos = a.change > 0;
                         return (
                           <div key={a.ticker} style={{padding:20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
-                            <div style={{fontWeight:800, fontSize:'1.1rem', color:'#fff', marginBottom:4}}>{a.ticker}</div>
+                            <div style={{fontWeight:800, fontSize:'1.1rem', color:'var(--text-main)', marginBottom:4}}>{a.ticker}</div>
                             <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:12, height:'2.2em', overflow:'hidden'}}>{a.companyName}</div>
                             <div style={{fontSize:'1.4rem', fontWeight:700, marginBottom:4}}>{a.currentPrice?.toFixed(a.assetType === 'FX' ? 4 : 2)} {a.currency}</div>
                             <div style={{fontSize:'0.95rem', fontWeight:600, color: isPos ? 'var(--accent-primary)' : 'var(--accent-negative)'}}>
@@ -1058,7 +1097,7 @@ export default function App() {
                       value={screenerFilters[f.key as keyof typeof screenerFilters]}
                       onChange={e => setScreenerFilters(p => ({...p, [f.key]: e.target.value}))}
                       placeholder={f.placeholder}
-                      style={{width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+                      style={{width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
                   </div>
                 ))}
                 <div style={{display:'flex', alignItems:'flex-end'}}>
@@ -1126,7 +1165,7 @@ export default function App() {
                 </h2>
                 <button 
                   onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Dexter AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }])}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--glass-border)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
                 >
                   Geçmişi Temizle
                 </button>
@@ -1134,7 +1173,7 @@ export default function App() {
               
               <div ref={scrollRef} style={{ flex: 1, backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '16px' }}>
                 {assistantMessages.map((msg, i) => (
-                  <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.02)', color: msg.role === 'user' ? '#000' : '#fff', padding: '20px', borderRadius: '12px', border: msg.role === 'user' ? 'none' : '1px solid var(--glass-border)' }}>
+                  <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', backgroundColor: msg.role === 'user' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.02)', color: msg.role === 'user' ? '#000' : 'var(--text-main)', padding: '20px', borderRadius: '12px', border: msg.role === 'user' ? 'none' : '1px solid var(--glass-border)' }}>
                     {msg.role !== 'user' && msg.role !== 'system' && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--accent-primary)' }}>
                         <Activity size={16} /> <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>Dexter AI</span>
@@ -1159,7 +1198,7 @@ export default function App() {
                   onChange={(e) => setAssistantInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAssistantSend()}
                   placeholder="Hisse analizi iste, piyasa durumu sor, fon oluştur..." 
-                  style={{ flex: 1, padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '1rem', outline: 'none' }}
+                  style={{ flex: 1, padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1rem', outline: 'none' }}
                 />
                 <button 
                   onClick={handleAssistantSend}
@@ -1190,7 +1229,7 @@ export default function App() {
                   value={fundThemeInput}
                   onChange={(e) => setFundThemeInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && generateAiFund()}
-                  style={{ flex: 1, padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '1.1rem', outline: 'none' }}
+                  style={{ flex: 1, padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.1rem', outline: 'none' }}
                 />
                 <button 
                   onClick={generateAiFund}
@@ -1217,7 +1256,7 @@ export default function App() {
             <div className="animated-fade-in">
               <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px', marginBottom: '24px', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px' }}>
-                  <button onClick={() => window.print()} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                  <button onClick={() => window.print()} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     PDF İndir
                   </button>
                   <button onClick={() => {
@@ -1235,7 +1274,7 @@ export default function App() {
                         ];
                         downloadCsv(`${data.ticker}_${activeTab === 'annual' ? 'yillik' : 'ceyreklik'}_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
                       }}
-                      style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'#fff', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                      style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'var(--text-main)', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     CSV İndir
                   </button>
                   <button onClick={() => {
@@ -1245,10 +1284,10 @@ export default function App() {
                         if (isNaN(v)) return;
                         setAlerts(p => [...p, { id: crypto.randomUUID(), ticker: data.ticker, condition: 'above', price: v, createdAt: new Date().toISOString() }]);
                         alert(`Uyarı kuruldu: ${data.ticker} ≥ ${v} ₺`);
-                      }} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'#fff', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                      }} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'var(--text-main)', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     Uyarı Kur
                   </button>
-                  <button onClick={() => toggleWatchlist(data.ticker)} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                  <button onClick={() => toggleWatchlist(data.ticker)} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     {watchlist.includes(data.ticker) ? 'İzleme Listesinden Çıkar' : 'İzleme Listesine Ekle'}
                   </button>
                 </div>
@@ -1378,8 +1417,8 @@ export default function App() {
                     </div>
                     <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Hareketli Ortalamalar</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px', display:'flex', alignItems:'center' }}>SMA (20) <InfoTooltip content={GLOSSARY.sma} />: <span style={{ color: '#fff', marginLeft:4 }}>{(data.currentPrice * 1.02).toFixed(2)} ₺</span></div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>SMA (50): <span style={{ color: '#fff' }}>{(data.currentPrice * 1.05).toFixed(2)} ₺</span></div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px', display:'flex', alignItems:'center' }}>SMA (20) <InfoTooltip content={GLOSSARY.sma} />: <span style={{ color: 'var(--text-main)', marginLeft:4 }}>{(data.currentPrice * 1.02).toFixed(2)} ₺</span></div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>SMA (50): <span style={{ color: 'var(--text-main)' }}>{(data.currentPrice * 1.05).toFixed(2)} ₺</span></div>
                     </div>
                     <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>MACD Göstergesi (12, 26, 9) <InfoTooltip content={GLOSSARY.macd} /></div>
@@ -1390,7 +1429,7 @@ export default function App() {
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Teknik Sinyal</div>
                         <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>Karar Durumu</div>
                       </div>
-                      <div style={{ backgroundColor: 'var(--accent-negative)', color: '#fff', padding: '8px 24px', borderRadius: '24px', fontWeight: 800 }}>SAT</div>
+                      <div style={{ backgroundColor: 'var(--accent-negative)', color: 'var(--text-main)', padding: '8px 24px', borderRadius: '24px', fontWeight: 800 }}>SAT</div>
                     </div>
                   </div>
                 </div>
@@ -1486,7 +1525,7 @@ export default function App() {
                       value={compareInput}
                       onChange={handleCompareSearch}
                       placeholder="Karşılaştırmak için hisse ekle..."
-                      style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: '#fff' }}
+                      style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
                     />
                     {compareSuggestions.length > 0 && (
                       <div style={{ position: 'absolute', top: '100%', left: 0, right: '100px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '8px', marginTop: '8px', zIndex: 50 }}>
@@ -1534,7 +1573,7 @@ export default function App() {
                           style={{display:'block', padding:20, backgroundColor:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid var(--glass-border)', textDecoration:'none', color:'inherit', transition:'border-color 0.2s'}}
                           onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
                           onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--glass-border)'}>
-                          <div style={{fontWeight:700, color:'#fff', marginBottom:8, fontSize:'1.05rem'}}>{d.title}</div>
+                          <div style={{fontWeight:700, color:'var(--text-main)', marginBottom:8, fontSize:'1.05rem'}}>{d.title}</div>
                           {d.publishedDate && <div style={{fontSize:'0.85rem', color:'var(--accent-primary)', marginBottom:8}}>{new Date(d.publishedDate).toLocaleDateString('tr-TR', {day:'numeric', month:'long', year:'numeric'})}</div>}
                           <div style={{fontSize:'0.95rem', color:'var(--text-muted)', lineHeight:1.6}}>{d.snippet}</div>
                         </a>
@@ -1583,9 +1622,9 @@ export default function App() {
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={priceHistory.points} margin={{top:20, right:30, left:20, bottom:5}}>
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                              <XAxis dataKey="date" stroke="#999" tickFormatter={(d) => new Date(d).toLocaleDateString('tr-TR', {month:'short', year:'2-digit'})} />
-                              <YAxis stroke="#999" domain={['auto','auto']} tickFormatter={(v) => (v as number).toFixed(0)} />
-                              <Tooltip contentStyle={{backgroundColor:'#1c1c1c', border:'1px solid #333'}}
+                              <XAxis dataKey="date" stroke="var(--text-muted)" tickFormatter={(d) => new Date(d).toLocaleDateString('tr-TR', {month:'short', year:'2-digit'})} />
+                              <YAxis stroke="var(--text-muted)" domain={['auto','auto']} tickFormatter={(v) => (v as number).toFixed(0)} />
+                              <Tooltip contentStyle={{backgroundColor:'var(--bg-card)', border:'1px solid #333'}}
                                 labelFormatter={(d) => new Date(d).toLocaleDateString('tr-TR')}
                                 formatter={(v: any) => [Number(v).toFixed(2) + ' ₺', 'Kapanış']} />
                               <Line type="monotone" dataKey="close" stroke="var(--accent-primary)" strokeWidth={2} dot={false} name="Kapanış" />
@@ -1603,9 +1642,9 @@ export default function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsBar data={data.annual.slice().reverse()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="periodLabel" stroke="#999" />
-                        <YAxis stroke="#999" tickFormatter={(v) => (v / 1e9).toFixed(1) + ' Mlr ₺'} />
-                        <Tooltip contentStyle={{ backgroundColor: '#1c1c1c', border: '1px solid #333' }} />
+                        <XAxis dataKey="periodLabel" stroke="var(--text-muted)" />
+                        <YAxis stroke="var(--text-muted)" tickFormatter={(v) => (v / 1e9).toFixed(1) + ' Mlr ₺'} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid #333' }} />
                         <Bar dataKey="totalRevenue" fill="var(--accent-primary)" name="Satış Gelirleri" />
                         <Bar dataKey="netIncome" fill="#3b82f6" name="Net Kar" />
                       </RechartsBar>
@@ -1640,11 +1679,11 @@ function AddPositionForm({onAdd}: {onAdd: (p: any) => void}) {
   return (
     <div style={{display:'flex', gap:12, marginBottom:24, padding:20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
       <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="Sembol (THYAO)"
-        style={{flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+        style={{flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
       <input value={lots} onChange={e => setLots(e.target.value)} placeholder="Lot adedi" type="number"
-        style={{width:120, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+        style={{width:120, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
       <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Alış fiyatı ₺" type="number"
-        style={{width:140, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'#fff'}} />
+        style={{width:140, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
       <button onClick={submit} disabled={!ticker || !lots || !price}
         style={{padding:'10px 24px', borderRadius:8, border:'none', backgroundColor:'var(--accent-primary)', color:'#000', fontWeight:700, cursor:'pointer'}}>
         Pozisyon Ekle
@@ -1670,7 +1709,7 @@ function PortfolioTable({portfolio, prices, onRemove, onDownload}: {portfolio: a
             </div>
           </div>
         </div>
-        <button onClick={onDownload} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'#fff', cursor:'pointer'}}>Portföyü CSV İndir</button>
+        <button onClick={onDownload} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'var(--text-main)', cursor:'pointer'}}>Portföyü CSV İndir</button>
       </div>
       <table style={{width:'100%'}}>
         <thead><tr style={{color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'left'}}>
