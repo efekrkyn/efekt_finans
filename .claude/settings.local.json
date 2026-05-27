@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(./node_modules/.bin/tsc --noEmit --listFiles)",
+      "Bash(./node_modules/.bin/tsc --noEmit -p ./tsconfig.json)",
+      "Bash(./node_modules/.bin/tsc --noEmit -p ./tsconfig.json --listFiles)",
+      "Bash(./node_modules/.bin/vite build *)"
+    ]
+  }
+}
