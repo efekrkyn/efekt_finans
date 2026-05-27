@@ -387,6 +387,7 @@ export default function App() {
         .catch(e => console.error('Dividends:', e));
       setAiAnalysis('');
       setAiSentiment(null);
+      setAiError(null);
       setActiveTab('quarterly');
     } catch(e: any) { 
       if (e.name !== 'AbortError') {
@@ -472,10 +473,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'ai' && data && !aiAnalysis && !aiLoading && !error) {
+    if (activeTab === 'ai' && data && !aiAnalysis && !aiLoading && !error && !aiError) {
       fetchAiAnalysis(data.ticker);
     }
-  }, [activeTab, data, aiAnalysis, aiLoading, error, fetchAiAnalysis]);
+  }, [activeTab, data, aiAnalysis, aiLoading, error, aiError, fetchAiAnalysis]);
 
   const fundAbortRef = useRef<AbortController | null>(null);
   const generateAiFund = async () => {
