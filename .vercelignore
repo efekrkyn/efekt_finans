@@ -1,14 +1,15 @@
 # Vercel deploy sırasında upload edilmemesi gerekenler.
-# Backend için gerekli olmayan dosyalar:
-src/gateway/
-src/cron/
+# NOT: gateway/, cron/, tools/* — daha önce ignored idi ama transitive
+# import zinciri (server.ts → llm.ts → prompts.ts → tools/registry →
+# cron-tool/heartbeat-tool → gateway/cron) runtime'da
+# ERR_MODULE_NOT_FOUND ile patladı. Şimdi hepsi yüklü, sadece chat
+# endpoint çağrılırsa devreye girer. Function size sınırı altında.
+
+# Sadece açıkça gereksiz olanlar:
 src/cli.ts
 src/commands/
 src/evals/
 src/index.tsx
-src/tools/heartbeat/
-src/tools/cron/
-src/tools/registry.ts
 src/find_*.cjs
 src/fix_*.cjs
 src/recover.cjs
