@@ -3,14 +3,22 @@
  * server.ts'teki fetchHandler'ı doğrudan reuse ediyoruz.
  * Bun.serve sarmalayıcısı sadece Bun runtime'da çalışır (skip edilir burada).
  */
-import { fetchHandler } from '../src/server.js';
+import { fetchHandler } from '../src/server';
 
 export const config = {
-  // Node.js runtime — Bun beta'ya bağlı kalmıyoruz, yahoo-finance2 + langchain Node'da çalışıyor.
   runtime: 'nodejs',
-  maxDuration: 30, // AI çağrıları 20-25 sn sürebilir
+  maxDuration: 30,
 };
 
+// Hata yakalama — handler patlarsa Vercel'a 500 yerine net JSON hata mesajı dön
 export default async function handler(req: Request): Promise<Response> {
-  return fetchHandler(req);
+  try {
+    return await fetchHandler(req);
+  } catch (err: any) {
+    console.error('[api] handler crashed:', err?.stack || err);
+    return new Response(
+      JSON.stringify({ error: 'Backend hatası', detail: err?.message || String(err) }),
+      { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+    );
+  }
 }
