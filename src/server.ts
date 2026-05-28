@@ -1204,21 +1204,7 @@ Markdown formatında hazırla.
 console.log(`🌐 Server running at: http://localhost:${server.port}`);
 console.log(`📁 Static files served from: ${DIST_DIR}`);
 
-// Warm-up: ilk açılışta popüler hisseleri cache'e doldur
-// Bu sayede kullanıcı sayfayı ilk açtığında 429 görmez, taze veri var
-const WARMUP_TICKERS = ['THYAO', 'TUPRS', 'KCHOL', 'AKBNK', 'ASELS', 'BIMAS', 'GARAN', 'SISE', 'EREGL', 'ISCTR'];
-(async () => {
-  await new Promise(r => setTimeout(r, 2000)); // 2 sn bekle, port hazır olsun
-  log('info', 'warmup_start', { tickers: WARMUP_TICKERS.length });
-  for (const t of WARMUP_TICKERS) {
-    try {
-      const data = await fetchBISTData(t);
-      cacheSet(`analysis:${t}`, data, 1000 * 60 * 60);
-      log('info', 'warmup_ok', { ticker: t, source: data.dataSource });
-      await new Promise(r => setTimeout(r, 800)); // hisseler arası 800ms bekle (rate-limit'i tetiklememek için)
-    } catch (err) {
-      log('warn', 'warmup_fail', { ticker: t, error: (err as Error).message });
-    }
-  }
-  log('info', 'warmup_done', {});
-})();
+// NOT: Sunucu açılışında Yahoo'ya toplu istek atan warm-up bilerek devre dışı.
+// Önceki sürümde 10 ticker'lık warm-up datacenter IP'sini Yahoo'nun kalıcı
+// kara listesine sokuyordu. İstekler artık ihtiyaç olduğunda lazy yapılır
+// ve 429 durumunda İş Yatırım fallback'i + stale-cache devreye girer.

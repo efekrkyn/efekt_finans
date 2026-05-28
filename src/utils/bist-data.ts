@@ -56,8 +56,9 @@ function getQuarterLabel(dateObj: Date): string {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Yahoo Finance 429 (Too Many Requests) için exponential backoff + retry
-async function withRetry<T>(label: string, fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
+// Yahoo Finance 429 (Too Many Requests) için exponential backoff + retry.
+// 2 deneme yeterli — fazla retry IP'yi daha çok yorar ve fallback'a geçişi geciktirir.
+async function withRetry<T>(label: string, fn: () => Promise<T>, maxAttempts = 2): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -100,10 +101,13 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
           longName: fallbackName,
           regularMarketPrice: iy.price,
           marketCap: iy.marketCap || 0,
-          trailingPE: iy.trailingPE,
-          priceToBook: iy.priceToBook,
+          trailingPE: undefined, // İş Yatırım public endpoint F/K vermiyor
+          priceToBook: undefined,
           currency: 'TRY',
           regularMarketChangePercent: iy.change,
+          regularMarketDayHigh: iy.high,
+          regularMarketDayLow: iy.low,
+          regularMarketVolume: iy.volume,
         };
         usedFallback = true;
       } else {
