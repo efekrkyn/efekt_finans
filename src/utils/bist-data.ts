@@ -52,18 +52,43 @@ function getQuarterLabel(dateObj: Date): string {
   return `${year}/12`;
 }
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// Yahoo Finance 429 (Too Many Requests) için exponential backoff + retry
+async function withRetry<T>(label: string, fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = (err as Error).message || '';
+      const is429 = msg.includes('429') || msg.toLowerCase().includes('too many requests') || msg.toLowerCase().includes('crumb');
+      if (!is429 || attempt === maxAttempts) throw err;
+      const wait = 500 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 250); // 500/1000/2000/4000ms + jitter
+      console.warn(`[bist-data] ${label} 429 alındı, ${wait}ms beklenip tekrar denenecek (deneme ${attempt}/${maxAttempts})`);
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
 export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult> {
-  const formattedTicker = ticker.toUpperCase().endsWith('.IS') 
-    ? ticker.toUpperCase() 
+  const formattedTicker = ticker.toUpperCase().endsWith('.IS')
+    ? ticker.toUpperCase()
     : `${ticker.toUpperCase()}.IS`;
 
-  // 1. Fetch Quote for current market data
+  // 1. Fetch Quote for current market data — 429 olursa retry
   let quote;
   try {
-    quote = await yahooFinance.quote(formattedTicker);
+    quote = await withRetry(`quote(${formattedTicker})`, () => yahooFinance.quote(formattedTicker));
     if (!quote) throw new Error('Sonuç bulunamadı');
   } catch (err) {
-    throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): ${(err as Error).message}`);
+    const msg = (err as Error).message || '';
+    const friendly = msg.includes('429') || msg.toLowerCase().includes('too many requests') || msg.toLowerCase().includes('crumb')
+      ? `Yahoo Finance şu an istek limiti uyguluyor (429). Lütfen birkaç saniye sonra tekrar deneyin.`
+      : msg;
+    throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): ${friendly}`);
   }
 
   const companyName = quote.shortName || quote.longName || ticker;
@@ -76,27 +101,31 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
   // 2. Fetch quarterly financials (we need last 6-8 quarters to calculate YoY growth of quarters)
   let quarterlyRaw: any[] = [];
   try {
-    quarterlyRaw = await yahooFinance.fundamentalsTimeSeries(formattedTicker, {
-      period1: '2023-01-01',
-      period2: new Date().toISOString().split('T')[0],
-      type: 'quarterly',
-      module: 'all'
-    });
+    quarterlyRaw = await withRetry(`quarterly(${formattedTicker})`, () =>
+      yahooFinance.fundamentalsTimeSeries(formattedTicker, {
+        period1: '2023-01-01',
+        period2: new Date().toISOString().split('T')[0],
+        type: 'quarterly',
+        module: 'all'
+      })
+    );
   } catch (err) {
-    console.error('Quarterly fetch failed:', err);
+    console.error('Quarterly fetch failed:', (err as Error).message);
   }
 
   // 3. Fetch annual financials
   let annualRaw: any[] = [];
   try {
-    annualRaw = await yahooFinance.fundamentalsTimeSeries(formattedTicker, {
-      period1: '2020-01-01',
-      period2: new Date().toISOString().split('T')[0],
-      type: 'annual',
-      module: 'all'
-    });
+    annualRaw = await withRetry(`annual(${formattedTicker})`, () =>
+      yahooFinance.fundamentalsTimeSeries(formattedTicker, {
+        period1: '2020-01-01',
+        period2: new Date().toISOString().split('T')[0],
+        type: 'annual',
+        module: 'all'
+      })
+    );
   } catch (err) {
-    console.error('Annual fetch failed:', err);
+    console.error('Annual fetch failed:', (err as Error).message);
   }
 
   const mapPeriodData = (entry: any, isAnnual: boolean): BISTPeriodData => {
@@ -185,11 +214,13 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(today.getFullYear() - 1);
 
-    const histResult = await yahooFinance.historical(formattedTicker, {
-      period1: oneYearAgo.toISOString().split('T')[0],
-      period2: today.toISOString().split('T')[0],
-      interval: '1d'
-    });
+    const histResult = await withRetry(`historical(${formattedTicker})`, () =>
+      yahooFinance.historical(formattedTicker, {
+        period1: oneYearAgo.toISOString().split('T')[0],
+        period2: today.toISOString().split('T')[0],
+        interval: '1d'
+      })
+    );
 
     historicalPrices = (histResult || [])
       .filter(h => h.date && h.close !== undefined && h.close !== null)

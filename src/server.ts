@@ -18,6 +18,8 @@ const chatSessions: Record<string, InMemoryChatHistory> = {};
 const apiCache = new Map<string, {data: any, exp: number}>();
 function cacheGet(key: string) { const v = apiCache.get(key); if (v && v.exp > Date.now()) return v.data; return null; }
 function cacheSet(key: string, data: any, ttlMs: number) { apiCache.set(key, {data, exp: Date.now()+ttlMs}); }
+// Hata durumunda son başarılı cevabı (TTL'i bitmiş bile olsa) dön — Yahoo 429 fallback'i için
+function cacheGetStale(key: string) { const v = apiCache.get(key); return v ? v.data : null; }
 
 const rateLimits = new Map<string, number[]>();
 function rateLimit(req: Request, max: number, windowMs: number): boolean {
@@ -249,13 +251,27 @@ const server = Bun.serve({
           },
         });
       } catch (err) {
-        console.error(`[API] Analiz hatası (${ticker}):`, err);
-        return new Response(JSON.stringify({ error: (err as Error).message }), {
+        const msg = (err as Error).message || '';
+        const is429 = msg.includes('429') || msg.toLowerCase().includes('too many requests') || msg.toLowerCase().includes('crumb');
+        // 429 ise: önce stale cache (önceki başarılı sonuç) dene
+        if (is429) {
+          const stale = cacheGetStale(`analysis:${ticker}`);
+          if (stale) {
+            log('warn', 'serving_stale_due_to_429', { ticker });
+            return new Response(JSON.stringify({ ...stale, _stale: true, _staleReason: 'Yahoo Finance rate-limit (429) — son başarılı veri gösteriliyor' }), {
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+          console.error(`[API] Analiz hatası (${ticker}): 429 - stale cache de yok`);
+          return new Response(JSON.stringify({ error: 'Yahoo Finance şu an istek limiti uyguluyor (429). Birkaç saniye sonra tekrar deneyin.' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Retry-After': '30' },
+          });
+        }
+        console.error(`[API] Analiz hatası (${ticker}):`, msg);
+        return new Response(JSON.stringify({ error: msg }), {
           status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });
       }
     }
@@ -869,11 +885,14 @@ Raporunu Markdown formatında şu başlıklarla hazırla:
         
         const prompt = `Sen finansal bir duyarlılık analizi yapan yapay zekasın. Yalnızca JSON formatında yanıt verirsin. Aşağıda ${ticker} hissesiyle ilgili internetten toplanan son güncel haberler ve yorumlar yer almaktadır:\n\n${searchResults}\n\nYukarıdaki metni analiz et ve yatırımcıların bu hisse hakkındaki genel hissiyatını bul. JSON formatında şu anahtarları içeren bir yanıt döndür:\n- score (0 ile 100 arası bir sayı. 0 tam panik/negatif, 100 tam coşku/pozitif, 50 nötr)\n- summary (Bu skorun nedenini açıklayan 2-3 cümlelik çok net bir özet.)\n\nSADECE JSON YANITI VER, BAŞKA METİN YAZMA. Örn: {"score": 75, "summary": "Şirketin aldığı yeni ihaleler yatırımcılar arasında pozitif karşılandı."}`;
         
-        const responseText = await callLlm(prompt, { model: 'deepseek-chat', temperature: 0.1 });
-        
+        const result = await callLlm(prompt, { model: 'deepseek-chat' });
+        const responseText = typeof result.response === 'string'
+          ? result.response
+          : (result.response as any)?.content ?? String(result.response);
+
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
-        
+
         return new Response(jsonStr, { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
       } catch (err) {
         return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
@@ -985,7 +1004,10 @@ Format: {"ticker": "HİSSE KODU (örn: THYAO)", "condition": "above" VEYA "below
 Eğer kullanıcı hisse adını yazmışsa, BIST koduna çevir (örn: Türk Hava Yolları -> THYAO). Fiyat virgüllüyse noktaya çevir.
 Kullanıcı metni: "${body.query}"`;
 
-        const responseText = await callLlm(prompt, { model: 'deepseek-chat', temperature: 0 });
+        const result = await callLlm(prompt, { model: 'deepseek-chat' });
+        const responseText = typeof result.response === 'string'
+          ? result.response
+          : (result.response as any)?.content ?? String(result.response);
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
         return new Response(jsonStr, { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });

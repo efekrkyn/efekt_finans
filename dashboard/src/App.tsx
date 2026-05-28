@@ -116,16 +116,37 @@ const safeLocalStorage = {
   }
 };
 
+// One-time localStorage key migration: dexter-* / fintables-* → efekt-*
+(function migrateLocalStorageKeys() {
+  if (!isBrowser) return;
+  const flag = 'efekt-migration-v1';
+  if (safeLocalStorage.getItem(flag)) return;
+  const dexterKeys = ['session-id', 'theme', 'portfolio', 'api-key', 'alerts'];
+  for (const k of dexterKeys) {
+    const oldVal = safeLocalStorage.getItem(`dexter-${k}`);
+    if (oldVal != null && safeLocalStorage.getItem(`efekt-${k}`) == null) {
+      safeLocalStorage.setItem(`efekt-${k}`, oldVal);
+      safeLocalStorage.removeItem(`dexter-${k}`);
+    }
+  }
+  const oldWl = safeLocalStorage.getItem('efekt-watchlist');
+  if (oldWl != null && safeLocalStorage.getItem('efekt-watchlist') == null) {
+    safeLocalStorage.setItem('efekt-watchlist', oldWl);
+    safeLocalStorage.removeItem('efekt-watchlist');
+  }
+  safeLocalStorage.setItem(flag, '1');
+})();
+
 function getSessionId() {
-  let id = safeLocalStorage.getItem('dexter-session-id');
-  if (!id) { id = crypto.randomUUID(); safeLocalStorage.setItem('dexter-session-id', id); }
+  let id = safeLocalStorage.getItem('efekt-session-id');
+  if (!id) { id = crypto.randomUUID(); safeLocalStorage.setItem('efekt-session-id', id); }
   return id;
 }
 const sessionId = getSessionId();
 
 export default function App() {
   const [theme, setTheme] = useState<'dark'|'light'|'system'>(() => {
-    return (safeLocalStorage.getItem('dexter-theme') as any) || 'dark';
+    return (safeLocalStorage.getItem('efekt-theme') as any) || 'dark';
   });
 
   useEffect(() => {
@@ -139,7 +160,7 @@ export default function App() {
       document.documentElement.setAttribute('data-theme', effective);
     };
     apply();
-    safeLocalStorage.setItem('dexter-theme', theme);
+    safeLocalStorage.setItem('efekt-theme', theme);
     if (theme === 'system') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', apply);
@@ -222,9 +243,7 @@ export default function App() {
         setGlobalKapLoading(true);
         setGlobalKapNews('');
         try {
-          const res = await fetch(`${API_BASE}/api/kap-news`, {
-            headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
-          });
+          const res = await fetch(`${API_BASE}/api/kap-news`);
           const reader = res.body?.getReader();
           const decoder = new TextDecoder();
           if (reader) {
@@ -290,7 +309,7 @@ export default function App() {
     if (data) {
       setSentimentLoading(true);
       setSentimentData(null);
-      fetch(`${API_BASE}/api/sentiment?ticker=${data.ticker}`, { headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` } })
+      fetch(`${API_BASE}/api/sentiment?ticker=${data.ticker}`)
         .then(r => r.json())
         .then(d => { setSentimentData(d); setSentimentLoading(false); })
         .catch(() => setSentimentLoading(false));
@@ -310,7 +329,7 @@ export default function App() {
   type Position = { ticker: string; lots: number; entryPrice: number; entryDate: string };
   const [portfolio, setPortfolio] = useState<Position[]>(() => {
     try {
-      const saved = safeLocalStorage.getItem('dexter-portfolio');
+      const saved = safeLocalStorage.getItem('efekt-portfolio');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
@@ -334,9 +353,7 @@ export default function App() {
     setPeerCompareLoading(true);
     setPeerCompareData('');
     try {
-      const res = await fetch(`${API_BASE}/api/peer-compare?ticker=${data.ticker}`, {
-        headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
-      });
+      const res = await fetch(`${API_BASE}/api/peer-compare?ticker=${data.ticker}`);
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       if (reader) {
@@ -394,7 +411,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/portfolio-optimize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ portfolio })
       });
       if (!res.ok) throw new Error(await res.text());
@@ -436,7 +453,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/dividend-planner`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ portfolio, monthlyAddition })
       });
       const reader = res.body?.getReader();
@@ -464,7 +481,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    safeLocalStorage.setItem('dexter-portfolio', JSON.stringify(portfolio));
+    safeLocalStorage.setItem('efekt-portfolio', JSON.stringify(portfolio));
   }, [portfolio]);
 
   useEffect(() => {
@@ -481,7 +498,7 @@ export default function App() {
 
   type Alert = { id: string; ticker: string; condition: 'above'|'below'; price: number; createdAt: string };
   const [alerts, setAlerts] = useState<Alert[]>(() => {
-    try { return JSON.parse(safeLocalStorage.getItem('dexter-alerts') || '[]'); } catch { return []; }
+    try { return JSON.parse(safeLocalStorage.getItem('efekt-alerts') || '[]'); } catch { return []; }
   });
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
   const [triggeredAlerts, setTriggeredAlerts] = useState<Alert[]>([]);
@@ -492,9 +509,7 @@ export default function App() {
     setMacroLoading(true);
     setMacroData('');
     try {
-      const res = await fetch(`${API_BASE}/api/macro-analysis`, {
-        headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
-      });
+      const res = await fetch(`${API_BASE}/api/macro-analysis`);
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       if (reader) {
@@ -528,7 +543,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/alerts/parse`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: smartAlertInput })
       });
       const data = await res.json();
@@ -546,7 +561,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => { safeLocalStorage.setItem('dexter-alerts', JSON.stringify(alerts)); }, [alerts]);
+  useEffect(() => { safeLocalStorage.setItem('efekt-alerts', JSON.stringify(alerts)); }, [alerts]);
 
   useEffect(() => {
     if (alerts.length === 0) return;
@@ -616,14 +631,14 @@ export default function App() {
     didMountRef.current = true;
 
     try {
-      const saved = safeLocalStorage.getItem('fintables-watchlist');
+      const saved = safeLocalStorage.getItem('efekt-watchlist');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) setWatchlist(parsed.filter(t => typeof t === 'string'));
       }
     } catch (e) {
       console.warn('Watchlist parse failed, resetting:', e);
-      safeLocalStorage.removeItem('fintables-watchlist');
+      safeLocalStorage.removeItem('efekt-watchlist');
     }
     
     fetch(`${API_BASE}/api/market-summary`)
@@ -646,7 +661,7 @@ export default function App() {
   const toggleWatchlist = (ticker: string) => {
     const updated = watchlist.includes(ticker) ? watchlist.filter(t => t !== ticker) : [...watchlist, ticker];
     setWatchlist(updated);
-    safeLocalStorage.setItem('fintables-watchlist', JSON.stringify(updated));
+    safeLocalStorage.setItem('efekt-watchlist', JSON.stringify(updated));
   };
 
   const loadAbortRef = useRef<AbortController | null>(null);
@@ -660,6 +675,9 @@ export default function App() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Veri alınamadı');
       setData(json);
+      if (json._stale) {
+        setError(json._staleReason || 'Yahoo Finance şu an yavaş — son bilinen veri gösteriliyor.');
+      }
       setKapDisclosures([]);
       setKapLoading(true);
       fetch(`${API_BASE}/api/kap?ticker=${encodeURIComponent(ticker)}`)
@@ -809,7 +827,7 @@ export default function App() {
 
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, sessionId, model: aiChatModel, context: contextStr })
       });
 
