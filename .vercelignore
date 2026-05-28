@@ -1,0 +1,30 @@
+# Vercel deploy sırasında upload edilmemesi gerekenler.
+# Backend için gerekli olmayan dosyalar:
+src/gateway/
+src/cli.ts
+src/commands/
+src/evals/
+src/index.tsx
+src/find_*.cjs
+src/fix_*.cjs
+src/recover.cjs
+src/rebuild.cjs
+src/restore_app.cjs
+src/test-*.ts
+
+# Build & cache
+dashboard/node_modules/
+dashboard/dist/
+
+# Local
+.env
+.dexter/
+.github/
+*.test.ts
+*.test.tsx
+node_modules/
+
+# Docs
+README.md
+AGENTS.md
+SOUL.md

@@ -100,14 +100,11 @@ async function searchTavily(query: string): Promise<string> {
   }
 }
 
-console.log(`===================================================`);
-console.log(`🚀 BIST Fintables Dashboard Server starting...`);
-console.log(`===================================================`);
-
-const server = Bun.serve({
-  port: PORT,
-  idleTimeout: 120,
-  async fetch(req) {
+/**
+ * Ortak fetch handler — hem Bun.serve hem Vercel Functions için aynı logic.
+ * Web Standard Request → Response imzası.
+ */
+export async function fetchHandler(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname;
 
@@ -1177,32 +1174,47 @@ Markdown formatında hazırla.
       });
     }
 
-    // Serve Static Dashboard
-    let filePath = join(DIST_DIR, path === '/' ? 'index.html' : path);
-    let file = Bun.file(filePath);
+    // Serve Static Dashboard — sadece Bun runtime'da (Vercel'da static Vercel tarafından servis edilir)
+    const isBunRuntime = typeof (globalThis as any).Bun !== 'undefined';
+    if (isBunRuntime) {
+      let filePath = join(DIST_DIR, path === '/' ? 'index.html' : path);
+      let file = (globalThis as any).Bun.file(filePath);
 
-    // Single Page Application routing fallback
-    if (!(await file.exists())) {
-      filePath = join(DIST_DIR, 'index.html');
-      file = Bun.file(filePath);
-    }
+      // SPA fallback
+      if (!(await file.exists())) {
+        filePath = join(DIST_DIR, 'index.html');
+        file = (globalThis as any).Bun.file(filePath);
+      }
 
-    // Serve static file
-    if (await file.exists()) {
-      const isHashedAsset = filePath.includes('/assets/') && /-[a-zA-Z0-9]{6,}\.(js|css)$/.test(filePath);
-      return new Response(file, {
-        headers: isHashedAsset
-          ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
-          : { 'Cache-Control': 'no-cache' }
-      });
+      if (await file.exists()) {
+        const isHashedAsset = filePath.includes('/assets/') && /-[a-zA-Z0-9]{6,}\.(js|css)$/.test(filePath);
+        return new Response(file, {
+          headers: isHashedAsset
+            ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
+            : { 'Cache-Control': 'no-cache' }
+        });
+      }
     }
 
     return new Response('Not Found', { status: 404 });
-  },
-});
+}
 
-console.log(`🌐 Server running at: http://localhost:${server.port}`);
-console.log(`📁 Static files served from: ${DIST_DIR}`);
+// Bun runtime ise + bu dosya doğrudan çalıştırıldıysa Bun.serve başlat.
+// Vercel Functions ortamında fetchHandler api/[[...slug]].ts üzerinden çağrılır;
+// Bun yok ya da import edilmişse listen etmemeli (port çakışmasını önler).
+const isMain = (import.meta as any).main === true;
+if (isMain && typeof (globalThis as any).Bun !== 'undefined' && (globalThis as any).Bun.serve) {
+  console.log(`===================================================`);
+  console.log(`🚀 BIST Fintables Dashboard Server starting...`);
+  console.log(`===================================================`);
+  const server = (globalThis as any).Bun.serve({
+    port: PORT,
+    idleTimeout: 120,
+    fetch: fetchHandler,
+  });
+  console.log(`🌐 Server running at: http://localhost:${server.port}`);
+  console.log(`📁 Static files served from: ${DIST_DIR}`);
+}
 
 // NOT: Sunucu açılışında Yahoo'ya toplu istek atan warm-up bilerek devre dışı.
 // Önceki sürümde 10 ticker'lık warm-up datacenter IP'sini Yahoo'nun kalıcı
