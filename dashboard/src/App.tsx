@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Draggable from 'react-draggable';
 import { 
-  Search, ArrowUpRight, ArrowDownRight, Activity, DollarSign, TrendingUp, Download, Check, AlertCircle, Info, PieChart, Briefcase, ChevronDown, 
+  Search, ArrowUpRight, Activity, TrendingUp, Download, Briefcase, 
   ChevronRight, BarChart, Bell, BellRing, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2, X } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
@@ -147,7 +147,7 @@ export default function App() {
     }
   }, [theme]);
 
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'|'backtest'|'alerts'|'macro'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -800,9 +800,9 @@ export default function App() {
       const contextStr = `Mevcut Ekran: ${activeTab === 'quarterly' ? data?.ticker + ' Hisse Detayı' : activeTab}\n` + 
                          (data ? `Açık Hisse Verisi: ${JSON.stringify({
                             ticker: data.ticker, 
-                            fiyat: data.price,
+                            fiyat: data.currentPrice,
                             piyasaDegeri: data.marketCap,
-                            bilancoPuanlari: data.scores
+                            bilancoPuanlari: data.scorecard
                          })}\n` : '') +
                          `İzleme Listesi: ${watchlist.join(', ')}\n` +
                          `Portföy: ${portfolio.map(p => p.ticker).join(', ')}`;
@@ -1892,7 +1892,7 @@ export default function App() {
           )}
 
           {/* STOCK ANALYSIS VIEW */}
-          {data && !loading && !error && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'kap' && activeTab !== 'heatmap' && activeTab !== 'global' && activeTab !== 'screener' && (
+          {data && !loading && !error && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'heatmap' && activeTab !== 'global' && activeTab !== 'screener' && activeTab !== 'alerts' && activeTab !== 'macro' && (
             <div className="animated-fade-in">
               <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px', marginBottom: '24px', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px' }}>
