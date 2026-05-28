@@ -173,6 +173,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dataWarning, setDataWarning] = useState(''); // veri var ama eksik/fallback — banner gösterilir, ekran açık kalır
   const [data, setData] = useState<AnalysisResult | null>(null);
 
   const [aiAnalysis, setAiAnalysis] = useState('');
@@ -672,13 +673,13 @@ export default function App() {
     const ctrl = new AbortController();
     loadAbortRef.current = ctrl;
     setLoading(true);
-    if (attempt === 1) { setError(''); setSearchResults([]); setTickerInput(''); }
+    if (attempt === 1) { setError(''); setDataWarning(''); setSearchResults([]); setTickerInput(''); }
     try {
       const res = await fetch(`${API_BASE}/api/analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
       const json = await res.json();
       // 503 / 429 → otomatik retry (3 deneme, 4 sn arayla)
       if ((res.status === 503 || res.status === 429) && attempt < 3) {
-        setError(`Yahoo Finance limit uyguluyor. Otomatik tekrar denenecek (${attempt}/3)...`);
+        setDataWarning(`Yahoo Finance limit uyguluyor. Otomatik tekrar denenecek (${attempt}/3)...`);
         await new Promise(r => setTimeout(r, 4000));
         if (loadAbortRef.current === ctrl) {
           return loadStock(ticker, attempt + 1);
@@ -687,12 +688,13 @@ export default function App() {
       }
       if (!res.ok) throw new Error(json.error || 'Veri alınamadı');
       setData(json);
+      setError(''); // hard error temizle
       if (json._stale) {
-        setError(json._staleReason || 'Yahoo Finance şu an yavaş — son bilinen veri gösteriliyor.');
+        setDataWarning(json._staleReason || 'Son bilinen veri gösteriliyor.');
       } else if (json.dataSource === 'isyatirim-fallback') {
-        setError('Yahoo Finance limit uyguluyor — fiyat verisi İş Yatırım\'dan alındı. Bilanço verileri eksik olabilir.');
+        setDataWarning('Fiyat verisi İş Yatırım\'dan alındı. Bilanço verileri eksik olabilir.');
       } else {
-        setError('');
+        setDataWarning('');
       }
       setKapDisclosures([]);
       setKapLoading(true);
@@ -1317,8 +1319,14 @@ export default function App() {
             </div>
           )}
 
+          {dataWarning && !error && (
+            <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid #f59e0b', padding: '12px 16px', borderRadius: '8px', color: '#f59e0b', marginBottom: '1.5rem', fontSize: '0.9rem', display:'flex', alignItems:'center', gap:8 }}>
+              <span>⚠️</span> {dataWarning}
+            </div>
+          )}
+
           {/* DEFAULT HOME VIEW ("Piyasalar") */}
-          {!data && !loading && !error && activeTab === 'quarterly' && (
+          {!data && !loading && activeTab === 'quarterly' && (
             <div className="animated-fade-in" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: '32px' }}>
               
               <div>
@@ -1963,8 +1971,8 @@ export default function App() {
             </section>
           )}
 
-          {/* STOCK ANALYSIS VIEW */}
-          {data && !loading && !error && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'heatmap' && activeTab !== 'global' && activeTab !== 'screener' && activeTab !== 'alerts' && activeTab !== 'macro' && (
+          {/* STOCK ANALYSIS VIEW — error olsa bile data varsa göster (fallback uyarısı banner'da) */}
+          {data && !loading && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'heatmap' && activeTab !== 'global' && activeTab !== 'screener' && activeTab !== 'alerts' && activeTab !== 'macro' && (
             <div className="animated-fade-in">
               <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32, marginBottom: '24px', position: 'relative' }}>
                 <div style={{ position: isMobile ? 'static' : 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: isMobile ? 16 : 0, justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>

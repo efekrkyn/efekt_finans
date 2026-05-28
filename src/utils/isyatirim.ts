@@ -16,28 +16,33 @@ interface IsYatirimQuote {
   high?: number;
   low?: number;
   volume?: number;
+  /** Son ~600 günün kapanış serisi (teknik indikatör + chart için) */
+  history: { date: string; close: number }[];
+}
+
+function ddmmyyyy(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+
+function parseTrDate(s: string): string {
+  // "26-05-2026" → "2026-05-26"
+  const [dd, mm, yyyy] = s.split('-');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /**
- * İş Yatırım — Hisse fiyat ve piyasa değeri.
+ * İş Yatırım — Hisse fiyat + piyasa değeri + ~2 yıllık günlük kapanış.
  */
 export async function fetchIsYatirimQuote(ticker: string): Promise<IsYatirimQuote | null> {
   const sym = ticker.toUpperCase().replace('.IS', '');
   try {
     const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const dateStr = `${dd}-${mm}-${yyyy}`;
-    // 30 gün öncesi
     const past = new Date(today);
-    past.setDate(today.getDate() - 30);
-    const ddP = String(past.getDate()).padStart(2, '0');
-    const mmP = String(past.getMonth() + 1).padStart(2, '0');
-    const yyyyP = past.getFullYear();
-    const startStr = `${ddP}-${mmP}-${yyyyP}`;
+    past.setFullYear(today.getFullYear() - 2); // 2 yıl geriye
 
-    const url = `https://www.isyatirim.com.tr/_layouts/15/IsYatirim.Website/Common/Data.aspx/HisseTekil?hisse=${sym}&startdate=${startStr}&enddate=${dateStr}`;
+    const url = `https://www.isyatirim.com.tr/_layouts/15/IsYatirim.Website/Common/Data.aspx/HisseTekil?hisse=${sym}&startdate=${ddmmyyyy(past)}&enddate=${ddmmyyyy(today)}`;
     const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'application/json' } });
     if (!res.ok) throw new Error(`İş Yatırım HTTP ${res.status}`);
     const data: any = await res.json();
@@ -55,6 +60,16 @@ export async function fetchIsYatirimQuote(ticker: string): Promise<IsYatirimQuot
       if (prev > 0) change = ((price - prev) / prev) * 100;
     }
 
+    const history = rows
+      .map((r: any) => {
+        const c = Number(r.HGDG_KAPANIS ?? r.HG_KAPANIS ?? NaN);
+        if (!isFinite(c)) return null;
+        const dateStr = typeof r.HGDG_TARIH === 'string' ? parseTrDate(r.HGDG_TARIH) : null;
+        if (!dateStr) return null;
+        return { date: dateStr, close: c };
+      })
+      .filter((x): x is { date: string; close: number } => x !== null);
+
     return {
       ticker: sym,
       price,
@@ -63,6 +78,7 @@ export async function fetchIsYatirimQuote(ticker: string): Promise<IsYatirimQuot
       high: latest.HGDG_MAX ? Number(latest.HGDG_MAX) : undefined,
       low: latest.HGDG_MIN ? Number(latest.HGDG_MIN) : undefined,
       volume: latest.HGDG_HACIM ? Number(latest.HGDG_HACIM) : undefined,
+      history,
     };
   } catch (err) {
     console.error(`[isyatirim] ${sym} fetch hatası:`, (err as Error).message);

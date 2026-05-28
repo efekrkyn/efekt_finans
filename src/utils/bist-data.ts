@@ -84,6 +84,7 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
   // 1. Fetch Quote for current market data — 429 olursa retry, sonra İş Yatırım fallback
   let quote: any = null;
   let usedFallback = false;
+  let fallbackHistory: { date: string; close: number }[] = [];
   try {
     quote = await withRetry(`quote(${formattedTicker})`, () => yahooFinance.quote(formattedTicker));
     if (!quote) throw new Error('Sonuç bulunamadı');
@@ -109,6 +110,7 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
           regularMarketDayLow: iy.low,
           regularMarketVolume: iy.volume,
         };
+        fallbackHistory = iy.history || [];
         usedFallback = true;
       } else {
         throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): Yahoo Finance şu an istek limiti uyguluyor (429) ve İş Yatırım yedek kaynağı da yanıt vermedi.`);
@@ -125,34 +127,38 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
   const priceToBook = quote.priceToBook;
   const currency = quote.currency || 'TRY';
 
-  // 2. Fetch quarterly financials (we need last 6-8 quarters to calculate YoY growth of quarters)
+  // 2. Fetch quarterly financials — fallback durumunda atla (Yahoo zaten 429 verir)
   let quarterlyRaw: any[] = [];
-  try {
-    quarterlyRaw = await withRetry(`quarterly(${formattedTicker})`, () =>
-      yahooFinance.fundamentalsTimeSeries(formattedTicker, {
-        period1: '2023-01-01',
-        period2: new Date().toISOString().split('T')[0],
-        type: 'quarterly',
-        module: 'all'
-      })
-    );
-  } catch (err) {
-    console.error('Quarterly fetch failed:', (err as Error).message);
+  if (!usedFallback) {
+    try {
+      quarterlyRaw = await withRetry(`quarterly(${formattedTicker})`, () =>
+        yahooFinance.fundamentalsTimeSeries(formattedTicker, {
+          period1: '2023-01-01',
+          period2: new Date().toISOString().split('T')[0],
+          type: 'quarterly',
+          module: 'all'
+        })
+      );
+    } catch (err) {
+      console.error('Quarterly fetch failed:', (err as Error).message);
+    }
   }
 
-  // 3. Fetch annual financials
+  // 3. Fetch annual financials — fallback durumunda atla
   let annualRaw: any[] = [];
-  try {
-    annualRaw = await withRetry(`annual(${formattedTicker})`, () =>
-      yahooFinance.fundamentalsTimeSeries(formattedTicker, {
-        period1: '2020-01-01',
-        period2: new Date().toISOString().split('T')[0],
-        type: 'annual',
-        module: 'all'
-      })
-    );
-  } catch (err) {
-    console.error('Annual fetch failed:', (err as Error).message);
+  if (!usedFallback) {
+    try {
+      annualRaw = await withRetry(`annual(${formattedTicker})`, () =>
+        yahooFinance.fundamentalsTimeSeries(formattedTicker, {
+          period1: '2020-01-01',
+          period2: new Date().toISOString().split('T')[0],
+          type: 'annual',
+          module: 'all'
+        })
+      );
+    } catch (err) {
+      console.error('Annual fetch failed:', (err as Error).message);
+    }
   }
 
   const mapPeriodData = (entry: any, isAnnual: boolean): BISTPeriodData => {
@@ -232,35 +238,41 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
     }
   }
 
-  // 5. Fetch historical prices (1 year) and compute technical indicators
+  // 5. Historical prices — fallback durumunda İş Yatırım history'si, değilse Yahoo
   let historicalPrices: { date: string; close: number }[] = [];
   let technicalIndicators: TechnicalIndicators | undefined;
 
-  try {
-    const today = new Date();
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(today.getFullYear() - 1);
+  if (usedFallback && fallbackHistory.length > 0) {
+    // İş Yatırım'dan 2 yıllık günlük kapanış zaten geldi
+    historicalPrices = fallbackHistory;
+    technicalIndicators = computeTechnicalIndicators(historicalPrices);
+  } else {
+    try {
+      const today = new Date();
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(today.getFullYear() - 1);
 
-    const histResult = await withRetry(`historical(${formattedTicker})`, () =>
-      yahooFinance.historical(formattedTicker, {
-        period1: oneYearAgo.toISOString().split('T')[0],
-        period2: today.toISOString().split('T')[0],
-        interval: '1d'
-      })
-    );
+      const histResult = await withRetry(`historical(${formattedTicker})`, () =>
+        yahooFinance.historical(formattedTicker, {
+          period1: oneYearAgo.toISOString().split('T')[0],
+          period2: today.toISOString().split('T')[0],
+          interval: '1d'
+        })
+      );
 
-    historicalPrices = (histResult || [])
-      .filter(h => h.date && h.close !== undefined && h.close !== null)
-      .map(h => ({
-        date: new Date(h.date).toISOString().split('T')[0],
-        close: h.close
-      }));
+      historicalPrices = (histResult || [])
+        .filter(h => h.date && h.close !== undefined && h.close !== null)
+        .map(h => ({
+          date: new Date(h.date).toISOString().split('T')[0],
+          close: h.close
+        }));
 
-    if (historicalPrices.length > 0) {
-      technicalIndicators = computeTechnicalIndicators(historicalPrices);
+      if (historicalPrices.length > 0) {
+        technicalIndicators = computeTechnicalIndicators(historicalPrices);
+      }
+    } catch (err) {
+      console.error(`[bist-data] Error fetching historical prices for ${formattedTicker}:`, err);
     }
-  } catch (err) {
-    console.error(`[bist-data] Error fetching historical prices for ${formattedTicker}:`, err);
   }
 
   return {
