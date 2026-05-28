@@ -57,8 +57,8 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 const DIST_DIR = join(process.cwd(), 'dashboard', 'dist');
 
 function requireApiKey(): Response | null {
-  if (!process.env.GOOGLE_API_KEY && !process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({error: 'API_KEY tanımlı değil'}), {
+  if (!process.env.DEEPSEEK_API_KEY && !process.env.GOOGLE_API_KEY && !process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    return new Response(JSON.stringify({error: 'LLM API_KEY tanımlı değil (DEEPSEEK / GOOGLE / OPENAI / ANTHROPIC)'}), {
       status: 503, headers: {'Content-Type':'application/json'}
     });
   }
