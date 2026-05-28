@@ -2,7 +2,7 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { ExaSearchResults } from '@langchain/exa';
 import Exa from 'exa-js';
 import { z } from 'zod';
-import { formatToolResult, parseSearchResults } from '../types.js';
+import { formatToolResult, parseSearchResults } from '../types';
 import { logger } from '@/utils';
 
 // Lazily initialized to avoid errors when API key is not set

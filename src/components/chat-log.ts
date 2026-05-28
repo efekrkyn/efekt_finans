@@ -1,9 +1,9 @@
 import { Container, Spacer, Text, type TUI } from '@mariozechner/pi-tui';
-import type { TokenUsage } from '../agent/types.js';
-import { theme } from '../theme.js';
-import { AnswerBoxComponent } from './answer-box.js';
-import { ToolEventComponent } from './tool-event.js';
-import { UserQueryComponent } from './user-query.js';
+import type { TokenUsage } from '../agent/types';
+import { theme } from '../theme';
+import { AnswerBoxComponent } from './answer-box';
+import { ToolEventComponent } from './tool-event';
+import { UserQueryComponent } from './user-query';
 
 function formatDuration(ms: number): string {
   if (ms < 1000) {

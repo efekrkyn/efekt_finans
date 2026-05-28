@@ -2,10 +2,10 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { constants } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { formatToolResult } from '../types.js';
-import { assertSandboxPath } from './sandbox.js';
-import { resolveReadPath } from './utils/path-utils.js';
-import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from './utils/truncate.js';
+import { formatToolResult } from '../types';
+import { assertSandboxPath } from './sandbox';
+import { resolveReadPath } from './utils/path-utils';
+import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from './utils/truncate';
 
 export const READ_FILE_DESCRIPTION = `
 Read file contents from the local workspace.

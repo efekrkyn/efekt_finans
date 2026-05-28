@@ -1,8 +1,8 @@
-import { MemoryDatabase } from './database.js';
-import { createEmbeddingClient } from './embeddings.js';
-import { MemoryIndexer } from './indexer.js';
-import { hybridSearch } from './search.js';
-import { MemoryStore } from './store.js';
+import { MemoryDatabase } from './database';
+import { createEmbeddingClient } from './embeddings';
+import { MemoryIndexer } from './indexer';
+import { hybridSearch } from './search';
+import { MemoryStore } from './store';
 import type {
   MemoryReadOptions,
   MemoryReadResult,
@@ -12,8 +12,8 @@ import type {
   MemorySessionContext,
   TemporalDecayConfig,
   MMRConfig,
-} from './types.js';
-import { getSetting } from '../utils/config.js';
+} from './types';
+import { getSetting } from '../utils/config';
 
 const DEFAULT_CONFIG: MemoryRuntimeConfig = {
   enabled: true,

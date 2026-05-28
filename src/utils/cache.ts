@@ -10,8 +10,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { createHash } from 'crypto';
-import { logger } from './logger.js';
-import { dexterPath } from './paths.js';
+import { logger } from './logger';
+import { dexterPath } from './paths';
 
 // ============================================================================
 // Types

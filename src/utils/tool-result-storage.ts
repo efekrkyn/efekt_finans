@@ -7,7 +7,7 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { dexterPath } from './paths.js';
+import { dexterPath } from './paths';
 
 /** Maximum characters for a single tool result in context. */
 export const MAX_TOOL_RESULT_CHARS = 50_000;

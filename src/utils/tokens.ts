@@ -4,7 +4,7 @@
  * falling back to character-based estimation.
  */
 
-import { resolveProvider } from '../providers.js';
+import { resolveProvider } from '../providers';
 
 // ---------------------------------------------------------------------------
 // Character-based estimation (fallback)

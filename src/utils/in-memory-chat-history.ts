@@ -1,5 +1,5 @@
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages';
-import { callLlm, DEFAULT_MODEL } from '../model/llm.js';
+import { callLlm, DEFAULT_MODEL } from '../model/llm';
 
 const DEFAULT_HISTORY_LIMIT = 10;
 const FULL_ANSWER_TURNS = 3;

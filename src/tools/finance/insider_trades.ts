@@ -1,8 +1,8 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api, stripFieldsDeep } from './api.js';
-import { formatToolResult } from '../types.js';
-import { TTL_1H } from './utils.js';
+import { api, stripFieldsDeep } from './api';
+import { formatToolResult } from '../types';
+import { TTL_1H } from './utils';
 
 const REDUNDANT_INSIDER_FIELDS = ['issuer'] as const;
 

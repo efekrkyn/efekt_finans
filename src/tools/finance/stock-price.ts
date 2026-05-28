@@ -1,7 +1,7 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api } from './api.js';
-import { formatToolResult } from '../types.js';
+import { api } from './api';
+import { formatToolResult } from '../types';
 
 export const STOCK_PRICE_DESCRIPTION = `
 Fetches current stock price snapshots for equities, including open, high, low, close prices, volume, and market cap. Powered by Financial Datasets.

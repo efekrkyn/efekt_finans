@@ -1,6 +1,6 @@
 import { Box, Container, Text } from '@mariozechner/pi-tui';
-import { logger, type LogEntry, type LogLevel } from '../utils/logger.js';
-import { theme } from '../theme.js';
+import { logger, type LogEntry, type LogLevel } from '../utils/logger';
+import { theme } from '../theme';
 
 const LEVEL_COLORS: Record<LogLevel, (text: string) => string> = {
   debug: theme.mutedDark,

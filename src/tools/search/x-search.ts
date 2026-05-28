@@ -1,6 +1,6 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { formatToolResult } from '../types.js';
+import { formatToolResult } from '../types';
 
 const X_API_BASE = 'https://api.x.com/2';
 const RATE_DELAY_MS = 350; // Delay between pagination requests to reduce rate-limit risk

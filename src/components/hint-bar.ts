@@ -1,6 +1,6 @@
 import { Container, Text } from '@mariozechner/pi-tui';
-import { theme } from '../theme.js';
-import type { SlashCommand } from '../commands/index.js';
+import { theme } from '../theme';
+import type { SlashCommand } from '../commands/index';
 
 // Strip ANSI escape codes to get visible character count
 function visibleLength(str: string): number {

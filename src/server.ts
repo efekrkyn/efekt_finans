@@ -1,13 +1,13 @@
 import { join } from 'path';
-import { fetchBISTData } from './utils/bist-data.js';
+import { fetchBISTData } from './utils/bist-data';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { checkEnv } from './utils/env-check.js';
-import { yahooFinance as yf, yahooFinance } from './utils/yahoo.js';
+import { checkEnv } from './utils/env-check';
+import { yahooFinance as yf, yahooFinance } from './utils/yahoo';
 
 checkEnv();
-import { callLlm, streamLlmWithMessages } from './model/llm.js';
-import { Agent } from './agent/agent.js';
-import { InMemoryChatHistory } from './utils/in-memory-chat-history.js';
+import { callLlm, streamLlmWithMessages } from './model/llm';
+import { Agent } from './agent/agent';
+import { InMemoryChatHistory } from './utils/in-memory-chat-history';
 
 const MAX_SESSIONS = 100;
 const SESSION_TTL_MS = 1000 * 60 * 60; // 1 saat
@@ -178,7 +178,7 @@ export async function fetchHandler(req: Request): Promise<Response> {
         const start = new Date(); start.setDate(end.getDate() - 200);
         const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
         const closes = history.quotes.map(q => q.close).filter((v): v is number => typeof v === 'number');
-        const { computeTechnicalIndicators } = await import('./utils/technical-indicators.js');
+        const { computeTechnicalIndicators } = await import('./utils/technical-indicators');
         const bars = closes.map((c, i) => ({ date: `day${i}`, close: c }));
         const indicators = computeTechnicalIndicators(bars);
         

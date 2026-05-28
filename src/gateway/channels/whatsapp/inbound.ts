@@ -6,15 +6,15 @@ import {
   type WAMessage,
   type proto,
 } from '@whiskeysockets/baileys';
-import { createWaSocket, getStatusCode, isLoggedOutReason, waitForWaConnection } from './session.js';
-import type { WhatsAppCloseReason, WhatsAppInboundMessage } from './types.js';
-import { setActiveWebListener } from './outbound.js';
-import { isRecentInboundMessage } from './dedupe.js';
-import { readSelfId } from './auth-store.js';
-import { checkInboundAccessControl } from '../../access-control.js';
-import { resolveJidToPhoneJid, type LidLookup } from './lid.js';
+import { createWaSocket, getStatusCode, isLoggedOutReason, waitForWaConnection } from './session';
+import type { WhatsAppCloseReason, WhatsAppInboundMessage } from './types';
+import { setActiveWebListener } from './outbound';
+import { isRecentInboundMessage } from './dedupe';
+import { readSelfId } from './auth-store';
+import { checkInboundAccessControl } from '../../access-control';
+import { resolveJidToPhoneJid, type LidLookup } from './lid';
 import { appendFileSync } from 'node:fs';
-import { dexterPath } from '../../../utils/paths.js';
+import { dexterPath } from '../../../utils/paths';
 
 const LOG_PATH = dexterPath('gateway-debug.log');
 function debugLog(msg: string) {

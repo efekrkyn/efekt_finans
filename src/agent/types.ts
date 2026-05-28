@@ -1,5 +1,5 @@
-import type { GroupContext } from './prompts.js';
-import type { MessageQueue } from '../utils/message-queue.js';
+import type { GroupContext } from './prompts';
+import type { MessageQueue } from '../utils/message-queue';
 
 // ============================================================================
 // Channel Profiles

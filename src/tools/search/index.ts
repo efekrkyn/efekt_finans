@@ -26,8 +26,8 @@ Search the web for current information on any topic. Returns relevant search res
 - Use for supplementary research when get_financials doesn't cover the topic
 `.trim();
 
-export { tavilySearch } from './tavily.js';
-export { exaSearch } from './exa.js';
-export { perplexitySearch } from './perplexity.js';
-export { langSearch } from './langsearch.js';
-export { xSearchTool, X_SEARCH_DESCRIPTION } from './x-search.js';
+export { tavilySearch } from './tavily';
+export { exaSearch } from './exa';
+export { perplexitySearch } from './perplexity';
+export { langSearch } from './langsearch';
+export { xSearchTool, X_SEARCH_DESCRIPTION } from './x-search';

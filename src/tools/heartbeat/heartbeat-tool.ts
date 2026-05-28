@@ -2,10 +2,10 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
-import { dexterPath } from '../../utils/paths.js';
-import { loadGatewayConfig, saveGatewayConfig } from '../../gateway/config.js';
-import { buildHeartbeatQuery } from '../../gateway/heartbeat/prompt.js';
-import { loadCronStore, saveCronStore } from '../../cron/store.js';
+import { dexterPath } from '../../utils/paths';
+import { loadGatewayConfig, saveGatewayConfig } from '../../gateway/config';
+import { buildHeartbeatQuery } from '../../gateway/heartbeat/prompt';
+import { loadCronStore, saveCronStore } from '../../cron/store';
 
 const HEARTBEAT_MD_PATH = dexterPath('HEARTBEAT.md');
 const HEARTBEAT_JOB_NAME = 'Heartbeat';

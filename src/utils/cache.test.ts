@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { buildCacheKey, readCache, writeCache } from './cache.js';
+import { buildCacheKey, readCache, writeCache } from './cache';
 
 const TEST_CACHE_DIR = '.dexter/cache';
 

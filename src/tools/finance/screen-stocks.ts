@@ -1,10 +1,10 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { z } from 'zod';
-import { callLlm } from '../../model/llm.js';
-import { formatToolResult } from '../types.js';
-import { getCurrentDate } from '../../agent/prompts.js';
-import { api } from './api.js';
+import { callLlm } from '../../model/llm';
+import { formatToolResult } from '../types';
+import { getCurrentDate } from '../../agent/prompts';
+import { api } from './api';
 
 /**
  * Rich description for the screen_stocks tool.

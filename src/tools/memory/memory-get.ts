@@ -1,7 +1,7 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { MemoryManager } from '../../memory/index.js';
-import { formatToolResult } from '../types.js';
+import { MemoryManager } from '../../memory/index';
+import { formatToolResult } from '../types';
 
 export const MEMORY_GET_DESCRIPTION = `
 Read specific memory file content from persistent memory storage.

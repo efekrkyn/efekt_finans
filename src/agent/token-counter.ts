@@ -1,4 +1,4 @@
-import type { TokenUsage } from './types.js';
+import type { TokenUsage } from './types';
 
 /**
  * Tracks token usage across multiple LLM calls.

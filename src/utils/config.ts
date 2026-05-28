@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import { dexterPath } from './paths.js';
+import { dexterPath } from './paths';
 
 const SETTINGS_FILE = dexterPath('settings.json');
 

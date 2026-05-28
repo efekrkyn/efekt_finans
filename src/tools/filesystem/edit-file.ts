@@ -2,8 +2,8 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { constants } from 'node:fs';
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { formatToolResult } from '../types.js';
-import { assertSandboxPath } from './sandbox.js';
+import { formatToolResult } from '../types';
+import { assertSandboxPath } from './sandbox';
 import {
   detectLineEnding,
   fuzzyFindText,
@@ -12,7 +12,7 @@ import {
   normalizeToLF,
   restoreLineEndings,
   stripBom,
-} from './utils/edit-diff.js';
+} from './utils/edit-diff';
 
 export const EDIT_FILE_DESCRIPTION = `
 Perform precise in-place text edits in a local workspace file.

@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
-import { getDexterDir } from './paths.js';
+import { getDexterDir } from './paths';
 
 /**
  * Represents a conversation entry (user message + agent response pair)

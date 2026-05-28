@@ -1,10 +1,10 @@
-import { getSetting, setSetting } from '../utils/config.js';
+import { getSetting, setSetting } from '../utils/config';
 import {
   checkApiKeyForSearchProvider,
   getSearchProviderDisplayName,
   saveApiKeyForSearchProvider,
   type SearchProviderId,
-} from '../utils/env.js';
+} from '../utils/env';
 
 const SELECTION_STATES = ['provider_select', 'api_key_confirm', 'api_key_input'] as const;
 

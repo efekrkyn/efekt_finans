@@ -1,8 +1,8 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api, stripFieldsDeep } from './api.js';
-import { formatToolResult } from '../types.js';
-import { TTL_24H } from './utils.js';
+import { api, stripFieldsDeep } from './api';
+import { formatToolResult } from '../types';
+import { TTL_24H } from './utils';
 
 const REDUNDANT_FINANCIAL_FIELDS = ['accession_number', 'currency', 'period'] as const;
 

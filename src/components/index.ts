@@ -1,9 +1,9 @@
-export { AnswerBoxComponent } from './answer-box.js';
-export { ApprovalPromptComponent } from './approval-prompt.js';
-export { ChatLogComponent } from './chat-log.js';
-export { DebugPanelComponent } from './debug-panel.js';
-export { CustomEditor } from './custom-editor.js';
-export { IntroComponent } from './intro.js';
+export { AnswerBoxComponent } from './answer-box';
+export { ApprovalPromptComponent } from './approval-prompt';
+export { ChatLogComponent } from './chat-log';
+export { DebugPanelComponent } from './debug-panel';
+export { CustomEditor } from './custom-editor';
+export { IntroComponent } from './intro';
 export {
   ApiKeyInputComponent,
   createApiKeyConfirmSelector,
@@ -11,8 +11,8 @@ export {
   createModelSelector,
   createProviderSelector,
   createSearchProviderSelector,
-} from './select-list.js';
-export { ToolEventComponent } from './tool-event.js';
-export { UserQueryComponent } from './user-query.js';
-export { HintBarComponent } from './hint-bar.js';
-export { WorkingIndicatorComponent } from './working-indicator.js';
+} from './select-list';
+export { ToolEventComponent } from './tool-event';
+export { UserQueryComponent } from './user-query';
+export { HintBarComponent } from './hint-bar';
+export { WorkingIndicatorComponent } from './working-indicator';

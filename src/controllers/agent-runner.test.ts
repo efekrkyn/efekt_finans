@@ -1,7 +1,7 @@
 import { describe, expect, test, mock, beforeEach, afterEach } from 'bun:test';
-import { AgentRunnerController } from './agent-runner.js';
-import { InMemoryChatHistory } from '../utils/in-memory-chat-history.js';
-import type { AgentConfig, AgentEvent, ApprovalDecision } from '../agent/types.js';
+import { AgentRunnerController } from './agent-runner';
+import { InMemoryChatHistory } from '../utils/in-memory-chat-history';
+import type { AgentConfig, AgentEvent, ApprovalDecision } from '../agent/types';
 
 /**
  * Helper to create an AgentRunnerController with a change counter

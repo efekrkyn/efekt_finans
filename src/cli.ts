@@ -5,22 +5,22 @@ import type {
   ToolEndEvent,
   ToolErrorEvent,
   ToolStartEvent,
-} from './agent/index.js';
+} from './agent/index';
 import {
   getApiKeyNameForProvider,
   getApiKeyNameForSearchProvider,
   getProviderDisplayName,
   getSearchProviderDisplayName,
-} from './utils/env.js';
-import { dexterPath } from './utils/paths.js';
-import { defaultQueue } from './utils/message-queue.js';
-import { logger } from './utils/logger.js';
+} from './utils/env';
+import { dexterPath } from './utils/paths';
+import { defaultQueue } from './utils/message-queue';
+import { logger } from './utils/logger';
 import {
   AgentRunnerController,
   InputHistoryController,
   ModelSelectionController,
   SearchSelectionController,
-} from './controllers/index.js';
+} from './controllers/index';
 import {
   ApiKeyInputComponent,
   ApprovalPromptComponent,
@@ -34,10 +34,10 @@ import {
   createModelSelector,
   createProviderSelector,
   createSearchProviderSelector,
-} from './components/index.js';
-import { editorTheme, theme } from './theme.js';
-import { matchCommands, type SlashCommand } from './commands/index.js';
-import { initSpinner } from './utils/spinner.js';
+} from './components/index';
+import { editorTheme, theme } from './theme';
+import { matchCommands, type SlashCommand } from './commands/index';
+import { initSpinner } from './utils/spinner';
 
 function truncateForHistory(text: string): string {
   const lines = text.split('\n');

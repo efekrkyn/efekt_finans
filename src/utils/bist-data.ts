@@ -1,6 +1,6 @@
-import { yahooFinance } from './yahoo.js';
-import { computeTechnicalIndicators, TechnicalIndicators } from './technical-indicators.js';
-import { fetchIsYatirimQuote, fetchIsYatirimCompanyName } from './isyatirim.js';
+import { yahooFinance } from './yahoo';
+import { computeTechnicalIndicators, TechnicalIndicators } from './technical-indicators';
+import { fetchIsYatirimQuote, fetchIsYatirimCompanyName } from './isyatirim';
 
 export interface BISTPeriodData {
   date: string;

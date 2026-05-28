@@ -1,10 +1,10 @@
 import { Container, Spacer, Text } from '@mariozechner/pi-tui';
-import type { WorkingState } from '../types.js';
-import type { StreamMode } from '../agent/types.js';
-import { getRandomThinkingVerb } from '../utils/thinking-verbs.js';
-import { theme } from '../theme.js';
-import { subscribeSpinner, currentSpinnerFrame } from '../utils/spinner.js';
-import { formatTurnDuration, formatTokensCompact } from '../utils/format.js';
+import type { WorkingState } from '../types';
+import type { StreamMode } from '../agent/types';
+import { getRandomThinkingVerb } from '../utils/thinking-verbs';
+import { theme } from '../theme';
+import { subscribeSpinner, currentSpinnerFrame } from '../utils/spinner';
+import { formatTurnDuration, formatTokensCompact } from '../utils/format';
 
 export interface TurnStats {
   turnStartMs: number;

@@ -1,8 +1,8 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 import { z } from 'zod';
-import { WEB_SEARCH_DESCRIPTION } from './index.js';
-import type { SearchProviderId } from '../../utils/env.js';
+import { WEB_SEARCH_DESCRIPTION } from './index';
+import type { SearchProviderId } from '../../utils/env';
 
 export interface WebSearchProvider {
   id: SearchProviderId;

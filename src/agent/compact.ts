@@ -7,9 +7,9 @@
  * subsequent iteration prompts while preserving key information.
  */
 
-import { callLlm } from '../model/llm.js';
-import { resolveProvider } from '../providers.js';
-import type { TokenUsage } from './types.js';
+import { callLlm } from '../model/llm';
+import { resolveProvider } from '../providers';
+import type { TokenUsage } from './types';
 
 // ---------------------------------------------------------------------------
 // Constants

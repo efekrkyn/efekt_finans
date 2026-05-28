@@ -1,5 +1,5 @@
-import { Scratchpad } from './scratchpad.js';
-import { TokenCounter } from './token-counter.js';
+import { Scratchpad } from './scratchpad';
+import { TokenCounter } from './token-counter';
 
 /**
  * Mutable state for a single agent run.

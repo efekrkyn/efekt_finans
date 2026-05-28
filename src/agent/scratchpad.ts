@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'crypto';
-import { dexterPath } from '../utils/paths.js';
+import { dexterPath } from '../utils/paths';
 
 /**
  * Record of a tool call for external consumers (e.g., DoneEvent)

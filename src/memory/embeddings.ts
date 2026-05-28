@@ -1,7 +1,7 @@
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { OllamaEmbeddings } from '@langchain/ollama';
 import { OpenAIEmbeddings } from '@langchain/openai';
-import type { EmbeddingProviderId, MemoryEmbeddingClient } from './types.js';
+import type { EmbeddingProviderId, MemoryEmbeddingClient } from './types';
 
 const DEFAULT_OPENAI_MODEL = 'text-embedding-3-small';
 const DEFAULT_GEMINI_MODEL = 'gemini-embedding-001';

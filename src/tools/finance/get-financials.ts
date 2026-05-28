@@ -2,11 +2,11 @@ import { DynamicStructuredTool, StructuredToolInterface } from '@langchain/core/
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { AIMessage, ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
-import { callLlm } from '../../model/llm.js';
-import { formatToolResult } from '../types.js';
-import { getCurrentDate } from '../../agent/prompts.js';
-import { withTimeout, SUB_TOOL_TIMEOUT_MS } from './utils.js';
-import { FINANCIAL_FORMATTERS } from './formatters.js';
+import { callLlm } from '../../model/llm';
+import { formatToolResult } from '../types';
+import { getCurrentDate } from '../../agent/prompts';
+import { withTimeout, SUB_TOOL_TIMEOUT_MS } from './utils';
+import { FINANCIAL_FORMATTERS } from './formatters';
 
 /**
  * Rich description for the get_financials tool.
@@ -51,10 +51,10 @@ function formatSubToolName(name: string): string {
 }
 
 // Import all finance tools directly (avoid circular deps with index.ts)
-import { getIncomeStatements, getBalanceSheets, getCashFlowStatements, getAllFinancialStatements } from './fundamentals.js';
-import { getKeyRatios, getHistoricalKeyRatios } from './key-ratios.js';
-import { getFinancialSegments } from './segments.js';
-import { getEarnings } from './earnings.js';
+import { getIncomeStatements, getBalanceSheets, getCashFlowStatements, getAllFinancialStatements } from './fundamentals';
+import { getKeyRatios, getHistoricalKeyRatios } from './key-ratios';
+import { getFinancialSegments } from './segments';
+import { getEarnings } from './earnings';
 
 // All finance tools available for routing
 const FINANCE_TOOLS: StructuredToolInterface[] = [

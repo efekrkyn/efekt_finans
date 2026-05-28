@@ -1,18 +1,18 @@
 import { appendFileSync } from 'node:fs';
-import { runAgentForMessage } from '../gateway/agent-runner.js';
+import { runAgentForMessage } from '../gateway/agent-runner';
 import {
   evaluateSuppression,
   HEARTBEAT_OK_TOKEN,
   type SuppressionState,
-} from '../gateway/heartbeat/suppression.js';
-import { assertOutboundAllowed, sendMessageWhatsApp } from '../gateway/channels/whatsapp/index.js';
-import { resolveSessionStorePath, loadSessionStore, type SessionEntry } from '../gateway/sessions/store.js';
-import { cleanMarkdownForWhatsApp } from '../gateway/utils.js';
-import { getSetting } from '../utils/config.js';
-import { dexterPath } from '../utils/paths.js';
-import { saveCronStore } from './store.js';
-import { computeNextRunAtMs } from './schedule.js';
-import type { ActiveHours, CronJob, CronStore } from './types.js';
+} from '../gateway/heartbeat/suppression';
+import { assertOutboundAllowed, sendMessageWhatsApp } from '../gateway/channels/whatsapp/index';
+import { resolveSessionStorePath, loadSessionStore, type SessionEntry } from '../gateway/sessions/store';
+import { cleanMarkdownForWhatsApp } from '../gateway/utils';
+import { getSetting } from '../utils/config';
+import { dexterPath } from '../utils/paths';
+import { saveCronStore } from './store';
+import { computeNextRunAtMs } from './schedule';
+import type { ActiveHours, CronJob, CronStore } from './types';
 
 const LOG_PATH = dexterPath('gateway-debug.log');
 

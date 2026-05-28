@@ -1,9 +1,9 @@
 import { existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { SkillMetadata, Skill, SkillSource } from './types.js';
-import { extractSkillMetadata, loadSkillFromPath } from './loader.js';
-import { dexterPath } from '../utils/paths.js';
+import type { SkillMetadata, Skill, SkillSource } from './types';
+import { extractSkillMetadata, loadSkillFromPath } from './loader';
+import { dexterPath } from '../utils/paths';
 
 // Get the directory of this file to locate builtin skills
 const __filename = fileURLToPath(import.meta.url);

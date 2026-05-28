@@ -1,15 +1,15 @@
-import { buildSnippet } from './chunker.js';
-import { embedSingleQuery } from './embeddings.js';
-import { applyTemporalDecay } from './temporal-decay.js';
-import { applyMMRToHybridResults } from './mmr.js';
-import type { MemoryDatabase } from './database.js';
+import { buildSnippet } from './chunker';
+import { embedSingleQuery } from './embeddings';
+import { applyTemporalDecay } from './temporal-decay';
+import { applyMMRToHybridResults } from './mmr';
+import type { MemoryDatabase } from './database';
 import type {
   MemoryEmbeddingClient,
   MemorySearchOptions,
   MemorySearchResult,
   TemporalDecayConfig,
   MMRConfig,
-} from './types.js';
+} from './types';
 
 type CombinedScore = {
   id: number;

@@ -1,7 +1,7 @@
 import { Container, Text } from '@mariozechner/pi-tui';
-import type { ApprovalDecision } from '../agent/types.js';
-import { createApprovalSelector } from './select-list.js';
-import { theme } from '../theme.js';
+import type { ApprovalDecision } from '../agent/types';
+import { createApprovalSelector } from './select-list';
+import { theme } from '../theme';
 
 function formatToolLabel(tool: string): string {
   return tool

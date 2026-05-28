@@ -1,8 +1,8 @@
-export { Agent } from './agent.js';
+export { Agent } from './agent';
 
-export { Scratchpad } from './scratchpad.js';
+export { Scratchpad } from './scratchpad';
 
-export { getCurrentDate, buildSystemPrompt, DEFAULT_SYSTEM_PROMPT } from './prompts.js';
+export { getCurrentDate, buildSystemPrompt, DEFAULT_SYSTEM_PROMPT } from './prompts';
 
 export type { 
   ApprovalDecision,
@@ -21,11 +21,11 @@ export type {
   MemoryRecalledEvent,
   MemoryFlushEvent,
   DoneEvent,
-} from './types.js';
+} from './types';
 
 export type { 
   ToolCallRecord, 
   ScratchpadEntry,
   ToolLimitConfig,
   ToolUsageStatus,
-} from './scratchpad.js';
+} from './scratchpad';

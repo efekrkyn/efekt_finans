@@ -1,9 +1,9 @@
-import { Agent } from '../agent/agent.js';
-import { InMemoryChatHistory } from '../utils/in-memory-chat-history.js';
-import { createMessageQueue, type MessageQueue, type QueuePriority } from '../utils/message-queue.js';
-import { HEARTBEAT_OK_TOKEN } from './heartbeat/suppression.js';
-import type { AgentEvent } from '../agent/types.js';
-import type { GroupContext } from '../agent/prompts.js';
+import { Agent } from '../agent/agent';
+import { InMemoryChatHistory } from '../utils/in-memory-chat-history';
+import { createMessageQueue, type MessageQueue, type QueuePriority } from '../utils/message-queue';
+import { HEARTBEAT_OK_TOKEN } from './heartbeat/suppression';
+import type { AgentEvent } from '../agent/types';
+import type { GroupContext } from '../agent/prompts';
 
 type SessionState = {
   history: InMemoryChatHistory;

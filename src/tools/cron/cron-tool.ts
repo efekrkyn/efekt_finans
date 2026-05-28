@@ -1,10 +1,10 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { loadCronStore, saveCronStore } from '../../cron/store.js';
-import { computeNextRunAtMs } from '../../cron/schedule.js';
-import { executeCronJob } from '../../cron/executor.js';
-import type { CronJob, CronSchedule } from '../../cron/types.js';
+import { loadCronStore, saveCronStore } from '../../cron/store';
+import { computeNextRunAtMs } from '../../cron/schedule';
+import { executeCronJob } from '../../cron/executor';
+import type { CronJob, CronSchedule } from '../../cron/types';
 
 export const CRON_TOOL_DESCRIPTION = `
 Manage scheduled/recurring tasks (cron jobs) that run automatically.

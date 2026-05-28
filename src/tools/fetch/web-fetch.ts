@@ -12,15 +12,15 @@
  */
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { formatToolResult } from '../types.js';
-import { wrapExternalContent, wrapWebContent } from './external-content.js';
+import { formatToolResult } from '../types';
+import { wrapExternalContent, wrapWebContent } from './external-content';
 import {
   extractReadableContent,
   htmlToMarkdown,
   markdownToText,
   truncateText,
   type ExtractMode,
-} from './web-fetch-utils.js';
+} from './web-fetch-utils';
 import {
   type CacheEntry,
   DEFAULT_CACHE_TTL_MINUTES,
@@ -32,7 +32,7 @@ import {
   resolveTimeoutSeconds,
   withTimeout,
   writeCache,
-} from './cache.js';
+} from './cache';
 
 /**
  * Rich description for the web_fetch tool.

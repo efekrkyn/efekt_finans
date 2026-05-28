@@ -1,5 +1,5 @@
 // Skill types
-export type { SkillMetadata, Skill, SkillSource } from './types.js';
+export type { SkillMetadata, Skill, SkillSource } from './types';
 
 // Skill registry functions
 export {
@@ -7,11 +7,11 @@ export {
   getSkill,
   buildSkillMetadataSection,
   clearSkillCache,
-} from './registry.js';
+} from './registry';
 
 // Skill loader functions
 export {
   parseSkillFile,
   loadSkillFromPath,
   extractSkillMetadata,
-} from './loader.js';
+} from './loader';

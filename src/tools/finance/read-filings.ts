@@ -2,11 +2,11 @@ import { DynamicStructuredTool, StructuredToolInterface } from '@langchain/core/
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { AIMessage, ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
-import { callLlm } from '../../model/llm.js';
-import { formatToolResult } from '../types.js';
-import { getCurrentDate } from '../../agent/prompts.js';
-import { getFilings, get10KFilingItems, get10QFilingItems, get8KFilingItems, getFilingItemTypes, type FilingItemTypes } from './filings.js';
-import { withTimeout, SUB_TOOL_TIMEOUT_MS } from './utils.js';
+import { callLlm } from '../../model/llm';
+import { formatToolResult } from '../types';
+import { getCurrentDate } from '../../agent/prompts';
+import { getFilings, get10KFilingItems, get10QFilingItems, get8KFilingItems, getFilingItemTypes, type FilingItemTypes } from './filings';
+import { withTimeout, SUB_TOOL_TIMEOUT_MS } from './utils';
 
 /**
  * Rich description for the read_filings tool.

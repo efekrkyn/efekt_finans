@@ -1,1 +1,1 @@
-export { webFetchTool } from './web-fetch.js';
+export { webFetchTool } from './web-fetch';

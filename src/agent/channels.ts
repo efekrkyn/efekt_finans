@@ -1,4 +1,4 @@
-import type { ChannelProfile } from './types.js';
+import type { ChannelProfile } from './types';
 
 // ============================================================================
 // Channel Profiles — add new channels here

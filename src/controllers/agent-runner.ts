@@ -1,14 +1,14 @@
-import { Agent } from '../agent/agent.js';
-import type { InMemoryChatHistory } from '../utils/in-memory-chat-history.js';
-import { defaultQueue } from '../utils/message-queue.js';
+import { Agent } from '../agent/agent';
+import type { InMemoryChatHistory } from '../utils/in-memory-chat-history';
+import { defaultQueue } from '../utils/message-queue';
 import type {
   AgentConfig,
   AgentEvent,
   ApprovalDecision,
   DoneEvent,
-} from '../agent/index.js';
-import type { DisplayEvent, StreamMode } from '../agent/types.js';
-import type { HistoryItem, HistoryItemStatus, WorkingState } from '../types.js';
+} from '../agent/index';
+import type { DisplayEvent, StreamMode } from '../agent/types';
+import type { HistoryItem, HistoryItemStatus, WorkingState } from '../types';
 
 export interface TurnStats {
   turnStartMs: number;

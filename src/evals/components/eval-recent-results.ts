@@ -1,5 +1,5 @@
 import { Container, Text } from '@mariozechner/pi-tui';
-import { theme } from '../../theme.js';
+import { theme } from '../../theme';
 
 export interface EvalResult {
   question: string;

@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { dexterPath } from '../utils/paths.js';
-import type { CronStore } from './types.js';
+import { dexterPath } from '../utils/paths';
+import type { CronStore } from './types';
 
 const CRON_STORE_PATH = dexterPath('cron', 'jobs.json');
 

@@ -1,10 +1,10 @@
-import { buildCompactToolDescriptions } from '../tools/registry.js';
-import { buildSkillMetadataSection, discoverSkills } from '../skills/index.js';
+import { buildCompactToolDescriptions } from '../tools/registry';
+import { buildSkillMetadataSection, discoverSkills } from '../skills/index';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getChannelProfile } from './channels.js';
-import { dexterPath } from '../utils/paths.js';
+import { getChannelProfile } from './channels';
+import { dexterPath } from '../utils/paths';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

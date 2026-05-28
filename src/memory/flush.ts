@@ -1,6 +1,6 @@
-import { callLlm } from '../model/llm.js';
-import { MemoryManager } from './index.js';
-import { CONTEXT_THRESHOLD } from '../utils/tokens.js';
+import { callLlm } from '../model/llm';
+import { MemoryManager } from './index';
+import { CONTEXT_THRESHOLD } from '../utils/tokens';
 
 export const MEMORY_FLUSH_TOKEN = 'NO_MEMORY_TO_FLUSH';
 

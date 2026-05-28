@@ -2,8 +2,8 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
-import { formatToolResult } from '../types.js';
-import { assertSandboxPath } from './sandbox.js';
+import { formatToolResult } from '../types';
+import { assertSandboxPath } from './sandbox';
 
 export const WRITE_FILE_DESCRIPTION = `
 Create or overwrite files in the local workspace.

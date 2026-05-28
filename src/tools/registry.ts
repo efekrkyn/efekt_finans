@@ -1,23 +1,23 @@
 import { StructuredToolInterface } from '@langchain/core/tools';
-import { createGetFinancials, createGetMarketData, createReadFilings, createScreenStocks } from './finance/index.js';
-import { exaSearch, perplexitySearch, tavilySearch, langSearch, WEB_SEARCH_DESCRIPTION, xSearchTool, X_SEARCH_DESCRIPTION } from './search/index.js';
-import { createWebSearchTool, type WebSearchProvider } from './search/web-search.js';
-import { getSetting } from '../utils/config.js';
-import type { SearchProviderId } from '../utils/env.js';
-import { skillTool, SKILL_TOOL_DESCRIPTION } from './skill.js';
-import { webFetchTool, WEB_FETCH_DESCRIPTION } from './fetch/web-fetch.js';
-import { browserTool, BROWSER_DESCRIPTION } from './browser/browser.js';
-import { readFileTool, READ_FILE_DESCRIPTION } from './filesystem/read-file.js';
-import { writeFileTool, WRITE_FILE_DESCRIPTION } from './filesystem/write-file.js';
-import { editFileTool, EDIT_FILE_DESCRIPTION } from './filesystem/edit-file.js';
-import { GET_FINANCIALS_DESCRIPTION } from './finance/get-financials.js';
-import { GET_MARKET_DATA_DESCRIPTION } from './finance/get-market-data.js';
-import { READ_FILINGS_DESCRIPTION } from './finance/read-filings.js';
-import { SCREEN_STOCKS_DESCRIPTION } from './finance/screen-stocks.js';
-import { heartbeatTool, HEARTBEAT_TOOL_DESCRIPTION } from './heartbeat/heartbeat-tool.js';
-import { cronTool, CRON_TOOL_DESCRIPTION } from './cron/cron-tool.js';
-import { memoryGetTool, MEMORY_GET_DESCRIPTION, memorySearchTool, MEMORY_SEARCH_DESCRIPTION, memoryUpdateTool, MEMORY_UPDATE_DESCRIPTION } from './memory/index.js';
-import { discoverSkills } from '../skills/index.js';
+import { createGetFinancials, createGetMarketData, createReadFilings, createScreenStocks } from './finance/index';
+import { exaSearch, perplexitySearch, tavilySearch, langSearch, WEB_SEARCH_DESCRIPTION, xSearchTool, X_SEARCH_DESCRIPTION } from './search/index';
+import { createWebSearchTool, type WebSearchProvider } from './search/web-search';
+import { getSetting } from '../utils/config';
+import type { SearchProviderId } from '../utils/env';
+import { skillTool, SKILL_TOOL_DESCRIPTION } from './skill';
+import { webFetchTool, WEB_FETCH_DESCRIPTION } from './fetch/web-fetch';
+import { browserTool, BROWSER_DESCRIPTION } from './browser/browser';
+import { readFileTool, READ_FILE_DESCRIPTION } from './filesystem/read-file';
+import { writeFileTool, WRITE_FILE_DESCRIPTION } from './filesystem/write-file';
+import { editFileTool, EDIT_FILE_DESCRIPTION } from './filesystem/edit-file';
+import { GET_FINANCIALS_DESCRIPTION } from './finance/get-financials';
+import { GET_MARKET_DATA_DESCRIPTION } from './finance/get-market-data';
+import { READ_FILINGS_DESCRIPTION } from './finance/read-filings';
+import { SCREEN_STOCKS_DESCRIPTION } from './finance/screen-stocks';
+import { heartbeatTool, HEARTBEAT_TOOL_DESCRIPTION } from './heartbeat/heartbeat-tool';
+import { cronTool, CRON_TOOL_DESCRIPTION } from './cron/cron-tool';
+import { memoryGetTool, MEMORY_GET_DESCRIPTION, memorySearchTool, MEMORY_SEARCH_DESCRIPTION, memoryUpdateTool, MEMORY_UPDATE_DESCRIPTION } from './memory/index';
+import { discoverSkills } from '../skills/index';
 
 /**
  * A registered tool with its rich description for system prompt injection.

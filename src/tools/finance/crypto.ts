@@ -1,7 +1,7 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api } from './api.js';
-import { formatToolResult } from '../types.js';
+import { api } from './api';
+import { formatToolResult } from '../types';
 
 const CryptoPriceSnapshotInputSchema = z.object({
   ticker: z

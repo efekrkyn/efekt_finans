@@ -1,8 +1,8 @@
 import { appendFileSync } from 'node:fs';
-import { dexterPath } from '../utils/paths.js';
-import { loadCronStore, saveCronStore } from './store.js';
-import { computeNextRunAtMs } from './schedule.js';
-import { executeCronJob } from './executor.js';
+import { dexterPath } from '../utils/paths';
+import { loadCronStore, saveCronStore } from './store';
+import { computeNextRunAtMs } from './schedule';
+import { executeCronJob } from './executor';
 
 const LOG_PATH = dexterPath('gateway-debug.log');
 

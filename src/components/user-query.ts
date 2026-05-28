@@ -1,5 +1,5 @@
 import { Container, Spacer, Text } from '@mariozechner/pi-tui';
-import { theme } from '../theme.js';
+import { theme } from '../theme';
 
 export class UserQueryComponent extends Container {
   private readonly body: Text;

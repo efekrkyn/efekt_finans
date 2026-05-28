@@ -1,26 +1,26 @@
-export { loadConfig, saveConfig, getSetting, setSetting } from './config.js';
+export { loadConfig, saveConfig, getSetting, setSetting } from './config';
 export {
   getApiKeyNameForProvider,
   getProviderDisplayName,
   checkApiKeyExistsForProvider,
   saveApiKeyForProvider,
-} from './env.js';
-export { InMemoryChatHistory } from './in-memory-chat-history.js';
-export { logger } from './logger.js';
-export type { LogEntry, LogLevel } from './logger.js';
-export { extractTextContent, hasToolCalls } from './ai-message.js';
-export { LongTermChatHistory } from './long-term-chat-history.js';
-export type { ConversationEntry } from './long-term-chat-history.js';
-export { findPrevWordStart, findNextWordEnd } from './text-navigation.js';
-export { cursorHandlers } from './input-key-handlers.js';
-export type { CursorContext } from './input-key-handlers.js';
-export { getToolDescription } from './tool-description.js';
-export { transformMarkdownTables, formatResponse } from './markdown-table.js';
-export { estimateTokens } from './tokens.js';
+} from './env';
+export { InMemoryChatHistory } from './in-memory-chat-history';
+export { logger } from './logger';
+export type { LogEntry, LogLevel } from './logger';
+export { extractTextContent, hasToolCalls } from './ai-message';
+export { LongTermChatHistory } from './long-term-chat-history';
+export type { ConversationEntry } from './long-term-chat-history';
+export { findPrevWordStart, findNextWordEnd } from './text-navigation';
+export { cursorHandlers } from './input-key-handlers';
+export type { CursorContext } from './input-key-handlers';
+export { getToolDescription } from './tool-description';
+export { transformMarkdownTables, formatResponse } from './markdown-table';
+export { estimateTokens } from './tokens';
 export {
   parseApiErrorInfo,
   classifyError,
   isContextOverflowError,
   isNonRetryableError,
   formatUserFacingError,
-} from './errors.js';
+} from './errors';

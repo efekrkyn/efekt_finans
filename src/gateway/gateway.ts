@@ -1,18 +1,18 @@
-import { createChannelManager } from './channels/manager.js';
-import { createWhatsAppPlugin } from './channels/whatsapp/plugin.js';
+import { createChannelManager } from './channels/manager';
+import { createWhatsAppPlugin } from './channels/whatsapp/plugin';
 import {
   assertOutboundAllowed,
   sendComposing,
   sendMessageWhatsApp,
   type WhatsAppInboundMessage,
-} from './channels/whatsapp/index.js';
-import { resolveRoute } from './routing/resolve-route.js';
-import { resolveSessionStorePath, upsertSessionMeta } from './sessions/store.js';
-import { loadGatewayConfig, type GatewayConfig } from './config.js';
-import { runAgentForMessage, isSessionRunning, enqueueForSession } from './agent-runner.js';
-import { cleanMarkdownForWhatsApp } from './utils.js';
-import { startCronRunner } from '../cron/runner.js';
-import { ensureHeartbeatCronJob } from '../cron/heartbeat-migration.js';
+} from './channels/whatsapp/index';
+import { resolveRoute } from './routing/resolve-route';
+import { resolveSessionStorePath, upsertSessionMeta } from './sessions/store';
+import { loadGatewayConfig, type GatewayConfig } from './config';
+import { runAgentForMessage, isSessionRunning, enqueueForSession } from './agent-runner';
+import { cleanMarkdownForWhatsApp } from './utils';
+import { startCronRunner } from '../cron/runner';
+import { ensureHeartbeatCronJob } from '../cron/heartbeat-migration';
 import {
   isBotMentioned,
   recordGroupMessage,
@@ -20,11 +20,11 @@ import {
   formatGroupHistoryContext,
   noteGroupMember,
   formatGroupMembersList,
-} from './group/index.js';
-import type { GroupContext } from '../agent/prompts.js';
+} from './group/index';
+import type { GroupContext } from '../agent/prompts';
 import { appendFileSync } from 'node:fs';
-import { dexterPath } from '../utils/paths.js';
-import { getSetting } from '../utils/config.js';
+import { dexterPath } from '../utils/paths';
+import { getSetting } from '../utils/config';
 
 const LOG_PATH = dexterPath('gateway-debug.log');
 function debugLog(msg: string) {

@@ -1,8 +1,8 @@
 import { AIMessage } from '@langchain/core/messages';
 import type { ToolCall } from '@langchain/core/messages/tool';
 import { StructuredToolInterface } from '@langchain/core/tools';
-import { createProgressChannel } from '../utils/progress-channel.js';
-import { all } from '../utils/concurrency.js';
+import { createProgressChannel } from '../utils/progress-channel';
+import { all } from '../utils/concurrency';
 import type {
   ApprovalDecision,
   ToolApprovalEvent,
@@ -12,8 +12,8 @@ import type {
   ToolLimitEvent,
   ToolProgressEvent,
   ToolStartEvent,
-} from './types.js';
-import type { RunContext } from './run-context.js';
+} from './types';
+import type { RunContext } from './run-context';
 
 type ToolExecutionEvent =
   | ToolStartEvent

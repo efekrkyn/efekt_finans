@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { dexterPath } from '../../utils/paths.js';
+import { dexterPath } from '../../utils/paths';
 
 export type SessionEntry = {
   sessionKey: string;

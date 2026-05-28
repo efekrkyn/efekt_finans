@@ -1,5 +1,5 @@
-import { readCache, writeCache, describeRequest } from '../../utils/cache.js';
-import { logger } from '../../utils/logger.js';
+import { readCache, writeCache, describeRequest } from '../../utils/cache';
+import { logger } from '../../utils/logger';
 
 const BASE_URL = 'https://api.financialdatasets.ai';
 

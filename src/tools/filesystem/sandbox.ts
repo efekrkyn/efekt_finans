@@ -1,6 +1,6 @@
 import { lstat } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
-import { resolveToCwd } from './utils/path-utils.js';
+import { resolveToCwd } from './utils/path-utils';
 
 export function resolveSandboxPath(params: { filePath: string; cwd: string; root: string }): {
   resolved: string;

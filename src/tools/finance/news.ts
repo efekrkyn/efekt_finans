@@ -1,8 +1,8 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api } from './api.js';
-import { formatToolResult } from '../types.js';
-import { TTL_15M } from './utils.js';
+import { api } from './api';
+import { formatToolResult } from '../types';
+import { TTL_15M } from './utils';
 
 const CompanyNewsInputSchema = z.object({
   ticker: z

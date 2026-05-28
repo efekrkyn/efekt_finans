@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import matter from 'gray-matter';
-import type { Skill, SkillSource } from './types.js';
+import type { Skill, SkillSource } from './types';
 
 /**
  * Parse a SKILL.md file content into a Skill object.
