@@ -665,18 +665,34 @@ export default function App() {
   };
 
   const loadAbortRef = useRef<AbortController | null>(null);
-  const loadStock = async (ticker: string) => {
-    loadAbortRef.current?.abort();
+  const loadStock = async (ticker: string, attempt: number = 1) => {
+    if (attempt === 1) {
+      loadAbortRef.current?.abort();
+    }
     const ctrl = new AbortController();
     loadAbortRef.current = ctrl;
-    setLoading(true); setError(''); setSearchResults([]); setTickerInput('');
+    setLoading(true);
+    if (attempt === 1) { setError(''); setSearchResults([]); setTickerInput(''); }
     try {
       const res = await fetch(`${API_BASE}/api/analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
       const json = await res.json();
+      // 503 / 429 → otomatik retry (3 deneme, 4 sn arayla)
+      if ((res.status === 503 || res.status === 429) && attempt < 3) {
+        setError(`Yahoo Finance limit uyguluyor. Otomatik tekrar denenecek (${attempt}/3)...`);
+        await new Promise(r => setTimeout(r, 4000));
+        if (loadAbortRef.current === ctrl) {
+          return loadStock(ticker, attempt + 1);
+        }
+        return;
+      }
       if (!res.ok) throw new Error(json.error || 'Veri alınamadı');
       setData(json);
       if (json._stale) {
         setError(json._staleReason || 'Yahoo Finance şu an yavaş — son bilinen veri gösteriliyor.');
+      } else if (json.dataSource === 'isyatirim-fallback') {
+        setError('Yahoo Finance limit uyguluyor — fiyat verisi İş Yatırım\'dan alındı. Bilanço verileri eksik olabilir.');
+      } else {
+        setError('');
       }
       setKapDisclosures([]);
       setKapLoading(true);
@@ -693,13 +709,13 @@ export default function App() {
       setAiSentiment(null);
       setAiError(null);
       setActiveTab('quarterly');
-    } catch(e: any) { 
+    } catch(e: any) {
       if (e.name !== 'AbortError') {
         setError(e.message);
         console.error(e);
       }
-    } finally { 
-      if (loadAbortRef.current === ctrl) setLoading(false); 
+    } finally {
+      if (loadAbortRef.current === ctrl) setLoading(false);
     }
   };
 

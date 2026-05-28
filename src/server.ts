@@ -236,13 +236,13 @@ const server = Bun.serve({
             volume: quote.regularMarketVolume,
             assetType: ticker.includes('=X') ? 'FX' : ticker.includes('-USD') ? 'CRYPTO' : 'EQUITY'
           };
-          cacheSet(`analysis:${ticker}`, data, 1000 * 60 * 5);
+          cacheSet(`analysis:${ticker}`, data, 1000 * 60 * 60); // 1 saat fresh, sonra stale fallback
           return new Response(JSON.stringify(data), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         }
         const startTime = Date.now();
         log('info', 'analysis', { ticker });
         const data = await fetchBISTData(ticker);
-        cacheSet(`analysis:${ticker}`, data, 1000 * 60 * 5); // 5 mins
+        cacheSet(`analysis:${ticker}`, data, 1000 * 60 * 60); // 1 saat fresh, sonra stale fallback // 5 mins
         log('info', 'analysis_done', { ticker, durationMs: Date.now() - startTime });
         return new Response(JSON.stringify(data), {
           headers: {
@@ -1203,3 +1203,22 @@ Markdown formatında hazırla.
 
 console.log(`🌐 Server running at: http://localhost:${server.port}`);
 console.log(`📁 Static files served from: ${DIST_DIR}`);
+
+// Warm-up: ilk açılışta popüler hisseleri cache'e doldur
+// Bu sayede kullanıcı sayfayı ilk açtığında 429 görmez, taze veri var
+const WARMUP_TICKERS = ['THYAO', 'TUPRS', 'KCHOL', 'AKBNK', 'ASELS', 'BIMAS', 'GARAN', 'SISE', 'EREGL', 'ISCTR'];
+(async () => {
+  await new Promise(r => setTimeout(r, 2000)); // 2 sn bekle, port hazır olsun
+  log('info', 'warmup_start', { tickers: WARMUP_TICKERS.length });
+  for (const t of WARMUP_TICKERS) {
+    try {
+      const data = await fetchBISTData(t);
+      cacheSet(`analysis:${t}`, data, 1000 * 60 * 60);
+      log('info', 'warmup_ok', { ticker: t, source: data.dataSource });
+      await new Promise(r => setTimeout(r, 800)); // hisseler arası 800ms bekle (rate-limit'i tetiklememek için)
+    } catch (err) {
+      log('warn', 'warmup_fail', { ticker: t, error: (err as Error).message });
+    }
+  }
+  log('info', 'warmup_done', {});
+})();

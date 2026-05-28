@@ -1,5 +1,6 @@
 import { yahooFinance } from './yahoo.js';
 import { computeTechnicalIndicators, TechnicalIndicators } from './technical-indicators.js';
+import { fetchIsYatirimQuote, fetchIsYatirimCompanyName } from './isyatirim.js';
 
 export interface BISTPeriodData {
   date: string;
@@ -40,6 +41,7 @@ export interface BISTAnalysisResult {
   };
   historicalPrices: { date: string; close: number }[];
   technicalIndicators?: TechnicalIndicators;
+  dataSource?: 'yahoo' | 'isyatirim-fallback';
 }
 
 // Format date into a readable quarter label like "2024/09"
@@ -78,17 +80,38 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
     ? ticker.toUpperCase()
     : `${ticker.toUpperCase()}.IS`;
 
-  // 1. Fetch Quote for current market data — 429 olursa retry
-  let quote;
+  // 1. Fetch Quote for current market data — 429 olursa retry, sonra İş Yatırım fallback
+  let quote: any = null;
+  let usedFallback = false;
   try {
     quote = await withRetry(`quote(${formattedTicker})`, () => yahooFinance.quote(formattedTicker));
     if (!quote) throw new Error('Sonuç bulunamadı');
   } catch (err) {
     const msg = (err as Error).message || '';
-    const friendly = msg.includes('429') || msg.toLowerCase().includes('too many requests') || msg.toLowerCase().includes('crumb')
-      ? `Yahoo Finance şu an istek limiti uyguluyor (429). Lütfen birkaç saniye sonra tekrar deneyin.`
-      : msg;
-    throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): ${friendly}`);
+    const is429 = msg.includes('429') || msg.toLowerCase().includes('too many requests') || msg.toLowerCase().includes('crumb');
+    if (is429) {
+      // Yahoo öldü — İş Yatırım fallback'i dene
+      console.warn(`[bist-data] Yahoo 429, İş Yatırım fallback deneniyor: ${formattedTicker}`);
+      const iy = await fetchIsYatirimQuote(ticker);
+      if (iy && iy.price > 0) {
+        const fallbackName = (await fetchIsYatirimCompanyName(ticker)) || ticker.toUpperCase();
+        quote = {
+          shortName: fallbackName,
+          longName: fallbackName,
+          regularMarketPrice: iy.price,
+          marketCap: iy.marketCap || 0,
+          trailingPE: iy.trailingPE,
+          priceToBook: iy.priceToBook,
+          currency: 'TRY',
+          regularMarketChangePercent: iy.change,
+        };
+        usedFallback = true;
+      } else {
+        throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): Yahoo Finance şu an istek limiti uyguluyor (429) ve İş Yatırım yedek kaynağı da yanıt vermedi.`);
+      }
+    } else {
+      throw new Error(`Hisse senedi verisi bulunamadı (${formattedTicker}): ${msg}`);
+    }
   }
 
   const companyName = quote.shortName || quote.longName || ticker;
@@ -249,6 +272,7 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
     annual,
     scorecard,
     historicalPrices,
-    technicalIndicators
+    technicalIndicators,
+    dataSource: usedFallback ? 'isyatirim-fallback' : 'yahoo'
   };
 }
