@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd dashboard && bun install && bun run build",
+  "buildCommand": "cd dashboard && npm install --ignore-scripts && npm run build",
   "outputDirectory": "dashboard/dist",
-  "installCommand": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 PUPPETEER_SKIP_DOWNLOAD=1 bun install",
+  "installCommand": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 PUPPETEER_SKIP_DOWNLOAD=1 npm install --ignore-scripts --legacy-peer-deps",
   "framework": null,
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" }
