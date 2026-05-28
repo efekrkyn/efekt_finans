@@ -2,9 +2,18 @@ import { join } from 'path';
 import { fetchBISTData } from './utils/bist-data.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check.js';
+import YahooFinance from 'yahoo-finance2';
+
+YahooFinance.suppressNotices(['yahooSurvey']);
+YahooFinance.setGlobalConfig({
+  fetchOptions: {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    }
+  }
+});
 
 checkEnv();
-import YahooFinance from 'yahoo-finance2';
 import { callLlm, streamLlmWithMessages } from './model/llm.js';
 import { Agent } from './agent/agent.js';
 import { InMemoryChatHistory } from './utils/in-memory-chat-history.js';
