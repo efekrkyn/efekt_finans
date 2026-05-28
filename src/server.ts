@@ -1204,11 +1204,8 @@ Markdown formatında hazırla.
     return new Response('Not Found', { status: 404 });
 }
 
-// Bun runtime ise + bu dosya doğrudan çalıştırıldıysa Bun.serve başlat.
-// Vercel Functions ortamında fetchHandler api/[[...slug]].ts üzerinden çağrılır;
-// Bun yok ya da import edilmişse listen etmemeli (port çakışmasını önler).
-const isMain = (import.meta as any).main === true;
-if (isMain && typeof (globalThis as any).Bun !== 'undefined' && (globalThis as any).Bun.serve) {
+// Bun runtime ise Bun.serve başlat (Render + local).
+if (typeof (globalThis as any).Bun !== 'undefined' && (globalThis as any).Bun.serve) {
   console.log(`===================================================`);
   console.log(`🚀 BIST Fintables Dashboard Server starting...`);
   console.log(`===================================================`);

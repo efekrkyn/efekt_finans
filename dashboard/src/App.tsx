@@ -7,9 +7,8 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as 
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
 
-// Backend artık Vercel'da aynı origin altında /api/* olarak servis ediliyor.
-// Local dev'de Vite proxy /api → http://localhost:3000 yönlendirir.
-const API_BASE = '';
+// Backend Render'da, frontend Vercel'da. Local dev'de Vite proxy /api → localhost:3000.
+const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://efekt-finans.onrender.com';
 
 const GLOSSARY = {
   pe: <><strong>F/K (Fiyat / Kazanç):</strong> Şirketin piyasa değerinin yıllık net kâra bölümü.<br/><strong>Formül:</strong> Piyasa Değeri / Net Kâr<br/><strong>Yorum:</strong> Düşük F/K genellikle ucuz, ama sektör bağımlı. BIST için &lt;10 ucuz sayılır.</>,
