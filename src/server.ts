@@ -6,8 +6,10 @@ import { yahooFinance as yf, yahooFinance } from './utils/yahoo';
 
 checkEnv();
 import { callLlm, streamLlmWithMessages } from './model/llm';
-import { Agent } from './agent/agent';
 import { InMemoryChatHistory } from './utils/in-memory-chat-history';
+// Agent lazy import edilir (sadece /api/chat içinde) — agent zinciri
+// tools/registry → cron-tool/heartbeat-tool → gateway/cron'a bağlı,
+// bunlar Vercel'da ignored. Health/analysis için yüklemeye gerek yok.
 
 const MAX_SESSIONS = 100;
 const SESSION_TTL_MS = 1000 * 60 * 60; // 1 saat
@@ -1132,7 +1134,10 @@ Markdown formatında hazırla.
             const history = chatSessions[sessionId];
             touchSession(sessionId);
             
-            const agent = await Agent.create({ 
+            // Lazy import — agent zinciri ağır (langchain + tools/registry) ve
+            // sadece bu endpoint için lazım.
+            const { Agent } = await import('./agent/agent');
+            const agent = await Agent.create({
               model: selectedModel,
               memoryEnabled: false // Disable vector DB memory (memory_search) which takes too long, keep chat history only.
             });
