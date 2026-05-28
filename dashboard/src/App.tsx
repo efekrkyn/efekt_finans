@@ -266,7 +266,7 @@ export default function App() {
     setGlobalLoading(true);
     const allSymbols = Object.values(GLOBAL_SYMBOLS).flat();
     Promise.all(allSymbols.map(s =>
-      fetch(`/api/asset?symbol=${encodeURIComponent(s)}`).then(r => r.json()).catch(() => null)
+      fetch(`${API_BASE}/api/asset?symbol=${encodeURIComponent(s)}`).then(r => r.json()).catch(() => null)
     )).then(results => {
       setGlobalAssets(results.filter(r => r && !r.error));
       setGlobalLoading(false);
@@ -279,7 +279,7 @@ export default function App() {
     try {
       const params = new URLSearchParams();
       Object.entries(screenerFilters).forEach(([k,v]) => { if (v) params.set(k, v); });
-      const res = await fetch(`/api/screener?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/api/screener?${params.toString()}`);
       const json = await res.json();
       setScreenerResults(json.results || []);
     } catch (e) { console.error(e); }
@@ -290,7 +290,7 @@ export default function App() {
     if (data) {
       setSentimentLoading(true);
       setSentimentData(null);
-      fetch(`/api/sentiment?ticker=${data.ticker}`, { headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` } })
+      fetch(`${API_BASE}/api/sentiment?ticker=${data.ticker}`, { headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` } })
         .then(r => r.json())
         .then(d => { setSentimentData(d); setSentimentLoading(false); })
         .catch(() => setSentimentLoading(false));
@@ -299,7 +299,7 @@ export default function App() {
 
   useEffect(() => {
     if (activeTab === 'charts' && data) {
-      fetch(`/api/price-history?ticker=${data.ticker}&range=${priceRange}`)
+      fetch(`${API_BASE}/api/price-history?ticker=${data.ticker}&range=${priceRange}`)
         .then(r => r.json())
         .then(setPriceHistory)
         .catch(e => console.error(e));
@@ -334,7 +334,7 @@ export default function App() {
     setPeerCompareLoading(true);
     setPeerCompareData('');
     try {
-      const res = await fetch(`/api/peer-compare?ticker=${data.ticker}`, {
+      const res = await fetch(`${API_BASE}/api/peer-compare?ticker=${data.ticker}`, {
         headers: { 'Authorization': `Bearer ${safeLocalStorage.getItem('dexter-api-key') || ''}` }
       });
       const reader = res.body?.getReader();
@@ -470,7 +470,7 @@ export default function App() {
   useEffect(() => {
     if (activeTab !== 'portfolio' || portfolio.length === 0) return;
     Promise.all(portfolio.map(p =>
-      fetch(`/api/analysis?ticker=${p.ticker}`).then(r => r.json()).catch(() => null)
+      fetch(`${API_BASE}/api/analysis?ticker=${p.ticker}`).then(r => r.json()).catch(() => null)
     )).then(results => {
       const prices: Record<string, number> = {};
       results.forEach((r: any, i) => { if (r?.currentPrice) prices[portfolio[i].ticker] = r.currentPrice; });
@@ -555,7 +555,7 @@ export default function App() {
       const prices: Record<string, number> = {};
       await Promise.all(uniqueTickers.map(async t => {
         try {
-          const r = await fetch(`/api/analysis?ticker=${t}`);
+          const r = await fetch(`${API_BASE}/api/analysis?ticker=${t}`);
           const j = await r.json();
           if (j.currentPrice) prices[t] = j.currentPrice;
         } catch {}
@@ -656,18 +656,18 @@ export default function App() {
     loadAbortRef.current = ctrl;
     setLoading(true); setError(''); setSearchResults([]); setTickerInput('');
     try {
-      const res = await fetch(`/api/analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
+      const res = await fetch(`${API_BASE}/api/analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Veri alınamadı');
       setData(json);
       setKapDisclosures([]);
       setKapLoading(true);
-      fetch(`/api/kap?ticker=${encodeURIComponent(ticker)}`)
+      fetch(`${API_BASE}/api/kap?ticker=${encodeURIComponent(ticker)}`)
         .then(r => r.json())
         .then(j => setKapDisclosures(j.disclosures || []))
         .catch(e => console.error('KAP:', e))
         .finally(() => setKapLoading(false));
-      fetch(`/api/dividends?ticker=${encodeURIComponent(ticker)}`)
+      fetch(`${API_BASE}/api/dividends?ticker=${encodeURIComponent(ticker)}`)
         .then(r => r.json())
         .then(j => setDividends(j.dividends || []))
         .catch(e => console.error('Dividends:', e));
@@ -698,7 +698,7 @@ export default function App() {
     setAiError(null);
     
     try {
-      const res = await fetch(`/api/ai-analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
+      const res = await fetch(`${API_BASE}/api/ai-analysis?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error('AI hatası');
       if (!res.body) throw new Error('Response body yok');
       
@@ -772,7 +772,7 @@ export default function App() {
     fundAbortRef.current = ctrl;
     setFundLoading(true); setFundError(''); setFundRecommendation('');
     try {
-      const res = await fetch(`/api/ai-fund?theme=${encodeURIComponent(fundThemeInput)}`, { signal: ctrl.signal });
+      const res = await fetch(`${API_BASE}/api/ai-fund?theme=${encodeURIComponent(fundThemeInput)}`, { signal: ctrl.signal });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Fon önerisi alınamadı.');
       setFundRecommendation(json.recommendation);
@@ -881,7 +881,7 @@ export default function App() {
     
     compareDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(val)}`);
         const json = await res.json();
         setCompareSuggestions(Array.isArray(json) ? json : json.results || []);
       } catch(e) { console.error(e); }
@@ -894,7 +894,7 @@ export default function App() {
     if (!data) return;
     try {
       const all = [data.ticker, ...compareStocks.map(s => s.ticker), ticker];
-      const res = await fetch(`/api/compare?tickers=${all.join(',')}`);
+      const res = await fetch(`${API_BASE}/api/compare?tickers=${all.join(',')}`);
       if (!res.ok) return;
       const json = await res.json();
       setCompareStocks(json.filter((s: any) => s.ticker !== data.ticker));
@@ -909,7 +909,7 @@ export default function App() {
     
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(val)}`);
         const json = await res.json();
         setSearchResults(Array.isArray(json) ? json : json.results || []);
       } catch(e) { console.error(e); }
