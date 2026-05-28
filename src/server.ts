@@ -4,15 +4,6 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check.js';
 import YahooFinance from 'yahoo-finance2';
 
-YahooFinance.suppressNotices(['yahooSurvey']);
-YahooFinance.setGlobalConfig({
-  fetchOptions: {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-    }
-  }
-});
-
 checkEnv();
 import { callLlm, streamLlmWithMessages } from './model/llm.js';
 import { Agent } from './agent/agent.js';
@@ -151,7 +142,7 @@ const server = Bun.serve({
         const start = new Date();
         const days = range === '1m' ? 30 : range === '3m' ? 90 : range === '6m' ? 180 : range === '1y' ? 365 : 1825;
         start.setDate(end.getDate() - days);
-        const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+        const yf = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
         const points = (history.quotes || [])
           .filter((q: any) => typeof q.close === 'number' && typeof q.open === 'number')
@@ -182,7 +173,7 @@ const server = Bun.serve({
 
       try {
         log('info', 'fetch_technicals', { ticker });
-        const yf = new YahooFinance({ suppressNotices: ['yahooSurvey','ripHistorical'] });
+        const yf = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
         const end = new Date();
         const start = new Date(); start.setDate(end.getDate() - 200);
@@ -227,7 +218,7 @@ const server = Bun.serve({
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         
         if (isForeign) {
-          const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+          const yf = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
           const quote: any = await yf.quote(ticker);
           const data = {
             ticker,
@@ -274,7 +265,7 @@ const server = Bun.serve({
       const symbol = url.searchParams.get('symbol');
       if (!symbol) return new Response(JSON.stringify({error:'symbol zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       try {
-        const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+        const yf = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const quote: any = await yf.quote(symbol);
         return new Response(JSON.stringify({
           ticker: symbol,
@@ -452,7 +443,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
         const cached = cacheGet(`search:${query}`);
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         log('info', 'search', { query });
-        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const searchResults = await yahooFinance.search(query, {
           quotesCount: 8,
           newsCount: 0,
@@ -596,7 +587,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       try {
         const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
-        const yf = new YahooFinance({ suppressNotices:['yahooSurvey','ripHistorical'] });
+        const yf = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const end = new Date();
         const start = new Date(); start.setFullYear(end.getFullYear() - 5);
         const result: any = await yf.chart(symbol, { period1: start, period2: end, interval: '1d', events: 'div' });
@@ -662,7 +653,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
 
         const bist30Symbols = ['AKBNK.IS','ALARK.IS','ARCLK.IS','ASELS.IS','ASTOR.IS','BIMAS.IS','BRSAN.IS','CWDEN.IS','ENKAI.IS','EREGL.IS','FROTO.IS','GARAN.IS','GUBRF.IS','HEKTS.IS','ISCTR.IS','KCHOL.IS','KONTR.IS','KOZAL.IS','KOZAA.IS','KRDMD.IS','MIATK.IS','ODAS.IS','OYAKC.IS','PETKM.IS','PGSUS.IS','SAHOL.IS','SASA.IS','SISE.IS','TCELL.IS','THYAO.IS','TOASO.IS','TUPRS.IS','YKBNK.IS'];
         
-        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const quotes = await Promise.all(
           bist30Symbols.map(async (sym) => {
             try {
@@ -690,7 +681,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       try {
         const cached = cacheGet('market-summary');
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
-        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const tickers = ['XU100.IS', 'TRY=X', 'EURTRY=X'];
         const promises = tickers.map(t => yahooFinance.quote(t).catch(() => null));
         const results = await Promise.all(promises);
@@ -726,7 +717,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         const years = body.years || 1;
         const strategy = body.strategy || 'sma';
 
-        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+        const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
         const period1 = new Date();
         period1.setFullYear(period1.getFullYear() - years);
         
@@ -813,7 +804,7 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
             const body = await req.json() as { portfolio: any[] };
             const portfolio = body.portfolio || [];
             
-            const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+            const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'], fetchOptions: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' } } });
             const enrichedPortfolio = await Promise.all(portfolio.map(async (p: any) => {
                try {
                  const q = await yahooFinance.quote(p.ticker + '.IS');
