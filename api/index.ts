@@ -1,12 +1,8 @@
 /**
- * DEBUG: Minimal handler — server.ts import'unu geçici devre dışı bıraktım.
- * /api/health çalışırsa, sorun server.ts içinde bir top-level import.
- * Çalışmazsa Vercel function setup sorunlu.
+ * DEBUG step 2: config export'unu kaldır, sadece default function bırak.
+ * 'runtime: nodejs' literal string @vercel/node tarafından tanınmıyor olabilir.
+ * vercel.json'daki functions.maxDuration zaten yeterli.
  */
-export const config = {
-  runtime: 'nodejs',
-  maxDuration: 30,
-};
 
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -15,7 +11,7 @@ export default async function handler(req: Request): Promise<Response> {
       ok: true,
       path: url.pathname,
       method: req.method,
-      msg: 'Minimal handler çalışıyor — server.ts import devre dışı',
+      msg: 'Step 2: config kaldırıldı',
       ts: new Date().toISOString(),
     }),
     {
