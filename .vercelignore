@@ -7,6 +7,8 @@ src/commands/
 src/evals/
 src/index.tsx
 src/tools/heartbeat/
+src/tools/cron/
+src/tools/registry.ts
 src/find_*.cjs
 src/fix_*.cjs
 src/recover.cjs
