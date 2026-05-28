@@ -5,10 +5,10 @@
   "installCommand": "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 PUPPETEER_SKIP_DOWNLOAD=1 npm install --ignore-scripts --legacy-peer-deps",
   "framework": null,
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" }
+    { "source": "/api/(.*)", "destination": "/api" }
   ],
   "functions": {
-    "api/[[...slug]].ts": {
+    "api/index.ts": {
       "maxDuration": 30
     }
   }

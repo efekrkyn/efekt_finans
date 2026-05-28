@@ -1,10 +1,12 @@
 # Vercel deploy sırasında upload edilmemesi gerekenler.
 # Backend için gerekli olmayan dosyalar:
 src/gateway/
+src/cron/
 src/cli.ts
 src/commands/
 src/evals/
 src/index.tsx
+src/tools/heartbeat/
 src/find_*.cjs
 src/fix_*.cjs
 src/recover.cjs
