@@ -1107,13 +1107,13 @@ export default function App() {
         
         {/* TOPBAR */}
         {activeTab !== 'assistant' && (
-        <header style={{ height: '70px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', padding: '0 24px', backgroundColor: 'var(--bg-card)', gap: '24px' }}>
+        <header style={{ height: '70px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px', backgroundColor: 'var(--bg-card)', gap: isMobile ? '8px' : '24px', flexShrink: 0 }}>
           {isMobile && (
-            <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" style={{background:'none', border:'none', color:'var(--text-main)', cursor:'pointer', padding:8, marginRight:16}}>
-              <Menu size={24} />
+            <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" style={{background:'none', border:'none', color:'var(--text-main)', cursor:'pointer', padding:4, flexShrink:0}}>
+              <Menu size={22} />
             </button>
           )}
-          <div ref={searchRef} style={{ position: 'relative', width: isMobile ? '100%' : '300px' }}>
+          <div ref={searchRef} style={{ position: 'relative', flex: isMobile ? 1 : 'none', width: isMobile ? 'auto' : '300px', minWidth: 0 }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input 
               value={tickerInput}
@@ -1164,35 +1164,6 @@ export default function App() {
                   </span>
                 )}
               </button>
-              {showAlertsPanel && (
-                <div style={{position:'absolute', top:30, right:0, width:320, backgroundColor:'var(--bg-card)', border:'1px solid var(--glass-border)', borderRadius:12, padding:20, zIndex:100, boxShadow:'0 10px 40px rgba(0,0,0,0.5)'}}>
-                  <h3 style={{fontSize:'1.1rem', fontWeight:700, marginBottom:16}}>Uyarılar</h3>
-                  {triggeredAlerts.length > 0 && (
-                    <div style={{marginBottom:16}}>
-                      <div style={{color:'var(--accent-primary)', fontSize:'0.85rem', fontWeight:700, marginBottom:8}}>TETİKLENEN</div>
-                      {triggeredAlerts.map(a => (
-                        <div key={a.id} style={{padding:10, backgroundColor:'rgba(16,185,129,0.1)', borderRadius:6, marginBottom:6, fontSize:'0.9rem'}}>
-                          <strong>{a.ticker}</strong> {a.condition === 'above' ? '≥' : '≤'} {a.price} ₺
-                        </div>
-                      ))}
-                      <button onClick={() => setTriggeredAlerts([])} style={{fontSize:'0.8rem', color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer'}}>Hepsini temizle</button>
-                    </div>
-                  )}
-                  {alerts.length === 0 && triggeredAlerts.length === 0 ? (
-                    <div style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>Henüz uyarı yok. Bir hisse açıp "Uyarı Kur" ile başla.</div>
-                  ) : (
-                    <>
-                      <div style={{color:'var(--text-muted)', fontSize:'0.85rem', fontWeight:700, marginBottom:8}}>AKTİF</div>
-                      {alerts.map(a => (
-                        <div key={a.id} style={{display:'flex', justifyContent:'space-between', padding:10, backgroundColor:'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:6, fontSize:'0.9rem'}}>
-                          <span><strong>{a.ticker}</strong> {a.condition === 'above' ? '≥' : '≤'} {a.price} ₺</span>
-                          <button onClick={() => setAlerts(p => p.filter(x => x.id !== a.id))} style={{background:'none', border:'none', color:'var(--accent-negative)', cursor:'pointer'}}>×</button>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              )}
             </div>
             {['xu100', 'usdtry', 'eurtry'].map((key) => {
               const mData = marketSummary?.[key as keyof MarketSummary];
@@ -1217,10 +1188,9 @@ export default function App() {
             })}
           </div>
 
-          <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--glass-border)' }}></div>
-          
-          <div style={{ display: 'flex', gap: '16px', color: 'var(--text-muted)' }}>
-            <button aria-label="Bildirimler" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}><Bell size={20} /></button>
+          {!isMobile && <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--glass-border)' }}></div>}
+
+          <div style={{ display: isMobile ? 'none' : 'flex', gap: '16px', color: 'var(--text-muted)', alignItems: 'center' }}>
             <div style={{display:'flex', backgroundColor:'rgba(255,255,255,0.05)', borderRadius:8, padding:2}}>
               {([
                 {val:'light', icon:Sun, label:'Açık'},
@@ -1239,11 +1209,77 @@ export default function App() {
             </div>
             <button aria-label="Kullanıcı Profili" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}><User size={20} /></button>
           </div>
+
+          {/* MOBILE-ONLY mini-bell: header'ın sağ ucu */}
+          {isMobile && (
+            <button
+              onClick={async () => {
+                if ('Notification' in window && Notification.permission === 'default') {
+                  await Notification.requestPermission();
+                }
+                setShowAlertsPanel(s => !s);
+              }}
+              aria-label="Bildirimler"
+              style={{position:'relative', background:'none', border:'none', color:'var(--text-main)', cursor:'pointer', padding:4, marginLeft:'auto', flexShrink:0}}>
+              <Bell size={22} />
+              {(alerts.length + triggeredAlerts.length) > 0 && (
+                <span style={{position:'absolute', top:-2, right:-2, backgroundColor:'var(--accent-negative)', color:'#fff', fontSize:9, fontWeight:700, borderRadius:'50%', width:14, height:14, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  {alerts.length + triggeredAlerts.length}
+                </span>
+              )}
+            </button>
+          )}
         </header>
         )}
 
+        {/* GLOBAL ALERTS PANEL (header'dan bağımsız, mobil + desktop) */}
+        {showAlertsPanel && (
+          <>
+            <div onClick={() => setShowAlertsPanel(false)} style={{position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.3)', zIndex:199}} />
+            <div style={{
+              position:'fixed',
+              top: isMobile ? 70 : 80,
+              right: isMobile ? 8 : 24,
+              left: isMobile ? 8 : 'auto',
+              width: isMobile ? 'auto' : 360,
+              maxHeight: 'calc(100vh - 100px)',
+              overflowY: 'auto',
+              backgroundColor:'var(--bg-card)', border:'1px solid var(--glass-border)', borderRadius:12, padding:20, zIndex:200, boxShadow:'0 10px 40px rgba(0,0,0,0.5)'
+            }}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16}}>
+                <h3 style={{fontSize:'1.1rem', fontWeight:700, margin:0}}>Uyarılar</h3>
+                <button onClick={() => setShowAlertsPanel(false)} aria-label="Kapat" style={{background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:20, padding:0, lineHeight:1}}>×</button>
+              </div>
+              {triggeredAlerts.length > 0 && (
+                <div style={{marginBottom:16}}>
+                  <div style={{color:'var(--accent-primary)', fontSize:'0.85rem', fontWeight:700, marginBottom:8}}>TETİKLENEN</div>
+                  {triggeredAlerts.map(a => (
+                    <div key={a.id} style={{padding:10, backgroundColor:'rgba(16,185,129,0.1)', borderRadius:6, marginBottom:6, fontSize:'0.9rem'}}>
+                      <strong>{a.ticker}</strong> {a.condition === 'above' ? '≥' : '≤'} {a.price} ₺
+                    </div>
+                  ))}
+                  <button onClick={() => setTriggeredAlerts([])} style={{fontSize:'0.8rem', color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer'}}>Hepsini temizle</button>
+                </div>
+              )}
+              {alerts.length === 0 && triggeredAlerts.length === 0 ? (
+                <div style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>Henüz uyarı yok. Bir hisse açıp "Uyarı Kur" ile başla.</div>
+              ) : (
+                <>
+                  <div style={{color:'var(--text-muted)', fontSize:'0.85rem', fontWeight:700, marginBottom:8}}>AKTİF</div>
+                  {alerts.map(a => (
+                    <div key={a.id} style={{display:'flex', justifyContent:'space-between', padding:10, backgroundColor:'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:6, fontSize:'0.9rem'}}>
+                      <span><strong>{a.ticker}</strong> {a.condition === 'above' ? '≥' : '≤'} {a.price} ₺</span>
+                      <button onClick={() => setAlerts(p => p.filter(x => x.id !== a.id))} style={{background:'none', border:'none', color:'var(--accent-negative)', cursor:'pointer'}}>×</button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </>
+        )}
+
         {/* SCROLLABLE MAIN */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: isMobile ? 16 : 32, minWidth: 0 }}>
           
           {loading && !data && (
             <div className="animated-fade-in" style={{display:'flex', flexDirection:'column', gap:'24px'}}>
@@ -1363,16 +1399,16 @@ export default function App() {
           {/* WATCHLIST VIEW */}
           
           {activeTab === 'portfolio' && (
-            <div className="animated-fade-in" style={{padding: isMobile ? 16 : 32, maxWidth:1100, margin:'0 auto'}}>
-              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:8}}>Kağıt Portföyüm</h2>
+            <div className="animated-fade-in" style={{padding: isMobile ? 0 : 32, maxWidth:1100, margin:'0 auto'}}>
+              <h2 style={{fontSize: isMobile ? '1.5rem' : '2rem', fontWeight:800, marginBottom:8}}>Kağıt Portföyüm</h2>
               <p style={{color:'var(--text-muted)', marginBottom:24}}>Gerçek para riski olmadan strateji dene. Tüm veriler tarayıcında saklanır.</p>
 
-              <AddPositionForm onAdd={(pos) => setPortfolio(p => [...p, pos])} />
+              <AddPositionForm onAdd={(pos) => setPortfolio(p => [...p, pos])} isMobile={isMobile} />
 
               {portfolio.length === 0 ? (
                 <div style={{textAlign:'center', padding:60, color:'var(--text-muted)'}}>Henüz pozisyon yok. Yukarıdan ekle.</div>
               ) : (
-                <PortfolioTable portfolio={portfolio} prices={portfolioPrices} onRemove={(i) => setPortfolio(p => p.filter((_,idx) => idx !== i))} onDownload={() => {
+                <PortfolioTable portfolio={portfolio} prices={portfolioPrices} isMobile={isMobile} onRemove={(i) => setPortfolio(p => p.filter((_,idx) => idx !== i))} onDownload={() => {
                   const headers = ['Sembol','Lot','Giriş Fiyatı','Giriş Tarihi','Güncel Fiyat','K/Z (₺)','K/Z (%)'];
                   const rows = portfolio.map(p => {
                     const cur = portfolioPrices[p.ticker] || p.entryPrice;
@@ -1457,31 +1493,31 @@ export default function App() {
             </div>
           )}
           {activeTab === 'alerts' && (
-            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
-              <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
-                <BellRing size={32} color="var(--accent-primary)" /> Akıllı Alarmlar
+            <div className="animated-fade-in" style={{ padding: isMobile ? 0 : 32, maxWidth: 1000, margin: '0 auto' }}>
+              <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
+                <BellRing size={isMobile ? 24 : 32} color="var(--accent-primary)" /> Akıllı Alarmlar
               </h2>
-              
-              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
+
+              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: isMobile ? 16 : 24, marginBottom: '32px' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '16px' }}>Doğal Dille Alarm Kur</h3>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.95rem' }}>
                   Yapay zeka asistanınıza ne istediğinizi yazın, o sizin için alarmı kursun. Örnek: <br/>
                   <span style={{ fontStyle: 'italic', color: 'var(--accent-primary)' }}>"Türk Hava Yolları 350'yi geçerse bana haber ver"</span> veya <br/>
                   <span style={{ fontStyle: 'italic', color: 'var(--accent-primary)' }}>"SAHOL 95 liranın altına düşerse uyar"</span>
                 </p>
-                
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <input 
-                    value={smartAlertInput} 
-                    onChange={(e) => setSmartAlertInput(e.target.value)} 
-                    placeholder="Alarm koşulunuzu yazın..." 
-                    style={{ flex: 1, padding: '16px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1rem' }} 
+
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px' }}>
+                  <input
+                    value={smartAlertInput}
+                    onChange={(e) => setSmartAlertInput(e.target.value)}
+                    placeholder="Alarm koşulunuzu yazın..."
+                    style={{ flex: 1, padding: '14px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', fontSize: '1rem', boxSizing: 'border-box' }}
                     onKeyDown={(e) => e.key === 'Enter' && createSmartAlert()}
                   />
-                  <button 
-                    onClick={createSmartAlert} 
+                  <button
+                    onClick={createSmartAlert}
                     disabled={smartAlertLoading}
-                    style={{ padding: '0 32px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: smartAlertLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    style={{ padding: isMobile ? '14px' : '0 32px', backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 800, cursor: smartAlertLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                   >
                     {smartAlertLoading ? <Loader2 className="spinner" size={20} /> : <Sparkles size={20} />}
                     {smartAlertLoading ? 'Kuruluyor...' : 'Alarm Kur'}
@@ -1514,12 +1550,12 @@ export default function App() {
           )}
           
           {activeTab === 'backtest' && (
-            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
-              <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
-                <Activity size={32} color="var(--accent-primary)" /> Backtest Simülatörü
+            <div className="animated-fade-in" style={{ padding: isMobile ? 0 : 32, maxWidth: 1000, margin: '0 auto' }}>
+              <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, marginBottom: '24px', display:'flex', alignItems:'center', gap:12 }}>
+                <Activity size={isMobile ? 24 : 32} color="var(--accent-primary)" /> Backtest Simülatörü
               </h2>
-              
-              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '24px', marginBottom: '32px', display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+
+              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: isMobile ? 16 : 24, marginBottom: '32px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1 1 200px' }}>
                   <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Hisse Simgesi</label>
                   <input value={backtestTicker} onChange={(e) => setBacktestTicker(e.target.value.toUpperCase())} placeholder="Örn: THYAO" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1rem' }} />
@@ -1598,8 +1634,8 @@ export default function App() {
             </div>
           )}
           {activeTab === 'watchlist' && (
-            <div className="animated-fade-in" style={{ padding: '32px' }}>
-              <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px' }}>İzleme Listesi</h2>
+            <div className="animated-fade-in" style={{ padding: isMobile ? 0 : 32 }}>
+              <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, marginBottom: '24px' }}>İzleme Listesi</h2>
               {watchlist.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>İzleme listenizde henüz hisse bulunmuyor. Hisseleri arayarak listeye ekleyebilirsiniz.</div>
               ) : (
@@ -1635,9 +1671,9 @@ export default function App() {
 
           {/* AGENDA VIEW */}
           {activeTab === 'agenda' && (
-            <div className="animated-fade-in" style={{ padding: '32px' }}>
-              <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px' }}>Bilanço Ajandası</h2>
-              <div style={{ backgroundColor: 'var(--bg-card)', padding: '32px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+            <div className="animated-fade-in" style={{ padding: isMobile ? 0 : 32 }}>
+              <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, marginBottom: '24px' }}>Bilanço Ajandası</h2>
+              <div style={{ backgroundColor: 'var(--bg-card)', padding: isMobile ? 16 : 32, borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {[
                     { date: 'Yarın, 18:00', event: 'TUPRS - 2026/03 Çeyreklik Bilanço Açıklaması' },
@@ -1645,8 +1681,8 @@ export default function App() {
                     { date: '15 Mayıs 2026', event: 'KCHOL - Temettü Dağıtımı (Hisse Başına 4.5 ₺)' },
                     { date: '20 Mayıs 2026', event: 'ASELS - 2026/03 Çeyreklik Bilanço Açıklaması' }
                   ].map((item, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '24px', paddingBottom: '16px', borderBottom: i === 3 ? 'none' : '1px solid var(--glass-border)' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--accent-primary)', width: '150px' }}>{item.date}</div>
+                    <div key={i} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 4 : 24, paddingBottom: '16px', borderBottom: i === 3 ? 'none' : '1px solid var(--glass-border)' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--accent-primary)', width: isMobile ? 'auto' : 150, fontSize: isMobile ? '0.85rem' : 'inherit' }}>{item.date}</div>
                       <div style={{ color: 'var(--text-main)' }}>{item.event}</div>
                     </div>
                   ))}
@@ -1657,10 +1693,10 @@ export default function App() {
 
           {/* AI ASSISTANT VIEW */}
           {activeTab === 'macro' && (
-            <div className="animated-fade-in" style={{ padding: '32px', maxWidth: 1000, margin: '0 auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <BrainCircuit size={32} color="var(--accent-primary)" /> Makroekonomi & Merkez Bankası (AI Analizi)
+            <div className="animated-fade-in" style={{ padding: isMobile ? 0 : 32, maxWidth: 1000, margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', flexWrap: 'wrap', gap: 12 }}>
+                <h2 style={{ fontSize: isMobile ? '1.4rem' : '2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <BrainCircuit size={isMobile ? 22 : 32} color="var(--accent-primary)" /> Makroekonomi & Merkez Bankası (AI Analizi)
                 </h2>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   {macroData && (
@@ -1702,8 +1738,8 @@ export default function App() {
           )}
 
           {activeTab === 'global' && (
-            <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
-              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:24}}>Global Varlıklar</h2>
+            <div className="animated-fade-in" style={{padding: isMobile ? 0 : 32, maxWidth:1200, margin:'0 auto'}}>
+              <h2 style={{fontSize: isMobile ? '1.5rem' : '2rem', fontWeight:800, marginBottom:24}}>Global Varlıklar</h2>
               {globalLoading && <div style={{color:'var(--text-muted)', textAlign:'center', padding:40}}><Loader2 className="spinner" size={32} /></div>}
               {!globalLoading && Object.entries(GLOBAL_SYMBOLS).map(([category, symbols]) => {
                 const categoryAssets = globalAssets.filter(a => symbols.includes(a.ticker));
@@ -1712,7 +1748,7 @@ export default function App() {
                 return (
                   <div key={category} style={{marginBottom:32}}>
                     <h3 style={{fontSize:'1.2rem', fontWeight:700, marginBottom:16}}>{emojis[category]} {category}</h3>
-                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:16}}>
+                    <div style={{display:'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: isMobile ? 12 : 16}}>
                       {categoryAssets.map(a => {
                         const isPos = a.change > 0;
                         return (
@@ -1734,9 +1770,9 @@ export default function App() {
           )}
 
           {activeTab === 'heatmap' && (
-            <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
-                <h2 style={{fontSize:'2rem', fontWeight:800}}>BIST 30 Heatmap</h2>
+            <div className="animated-fade-in" style={{padding: isMobile ? 0 : 32, maxWidth:1200, margin:'0 auto'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, flexWrap:'wrap', gap:12}}>
+                <h2 style={{fontSize: isMobile ? '1.5rem' : '2rem', fontWeight:800}}>BIST 30 Heatmap</h2>
                 <button onClick={() => { setHeatmapData([]); setHeatmapLoading(true); fetch(`${API_BASE}/api/heatmap`).then(r=>r.json()).then(d=>{setHeatmapData(Array.isArray(d)?d:[]); setHeatmapLoading(false);}).catch(()=>setHeatmapLoading(false)); }}
                   style={{padding:'8px 16px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'transparent', color:'var(--text-main)', cursor:'pointer'}}>
                   Yenile
@@ -1754,9 +1790,11 @@ export default function App() {
                       const intensity = Math.min(absChange / 5, 1);
                       const baseColor = d.change >= 0 ? 'var(--accent-primary-rgb)' : 'var(--accent-negative-rgb)';
                       const bg = `rgba(${baseColor}, ${0.2 + intensity * 0.8})`;
-                      const widthClass = d.marketCap > 100000000000 ? '24%' : d.marketCap > 50000000000 ? '16%' : '12%';
+                      const widthClass = isMobile
+                        ? (d.marketCap > 100000000000 ? '48%' : d.marketCap > 50000000000 ? '31%' : '23%')
+                        : (d.marketCap > 100000000000 ? '24%' : d.marketCap > 50000000000 ? '16%' : '12%');
                       return (
-                        <div key={d.ticker} 
+                        <div key={d.ticker}
                           title={`${d.companyName} — tıkla detay aç`}
                           onClick={() => loadStock(d.ticker)}
                           role="button"
@@ -1764,8 +1802,8 @@ export default function App() {
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadStock(d.ticker); } }}
                           style={{
                             flex: `1 1 ${widthClass}`,
-                            minWidth: 80,
-                            height: 80,
+                            minWidth: isMobile ? 70 : 80,
+                            height: isMobile ? 64 : 80,
                             backgroundColor: bg,
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                             color: '#fff', borderRadius: 4, cursor: 'pointer', border: '1px solid var(--glass-border)',
@@ -1774,8 +1812,8 @@ export default function App() {
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)'; e.currentTarget.style.zIndex = '10'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.zIndex = '1'; }}>
-                          <div style={{fontWeight:800, fontSize:'1rem'}}>{d.ticker}</div>
-                          <div style={{fontSize:'0.8rem', fontWeight:600}}>{d.change > 0 ? '+' : ''}{d.change.toFixed(2)}%</div>
+                          <div style={{fontWeight:800, fontSize: isMobile ? '0.85rem' : '1rem'}}>{d.ticker}</div>
+                          <div style={{fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight:600}}>{d.change > 0 ? '+' : ''}{d.change.toFixed(2)}%</div>
                         </div>
                       );
                     })}
@@ -1789,11 +1827,11 @@ export default function App() {
           )}
 
           {activeTab === 'screener' && (
-            <div className="animated-fade-in" style={{padding:32, maxWidth:1200, margin:'0 auto'}}>
-              <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:8}}>Hisse Tarayıcı</h2>
+            <div className="animated-fade-in" style={{padding: isMobile ? 0 : 32, maxWidth:1200, margin:'0 auto'}}>
+              <h2 style={{fontSize: isMobile ? '1.5rem' : '2rem', fontWeight:800, marginBottom:8}}>Hisse Tarayıcı</h2>
               <p style={{color:'var(--text-muted)', marginBottom:24}}>Kriterlere göre BIST hisselerini filtrele.</p>
-              
-              <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr) auto', gap:12, marginBottom:24, padding:20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
+
+              <div style={{display:'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr) auto', gap:12, marginBottom:24, padding: isMobile ? 16 : 20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
                 {([
                   {key:'minPE', label:'F/K min', placeholder:'örn: 0'},
                   {key:'maxPE', label:'F/K max', placeholder:'örn: 10'},
@@ -1826,8 +1864,8 @@ export default function App() {
               )}
               
               {!screenerLoading && screenerResults.length > 0 && (
-                <div style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', overflowX:'auto'}}>
-                  <table style={{width:'100%', borderCollapse:'collapse'}}>
+                <div style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', minWidth: isMobile ? 720 : 'auto'}}>
                     <thead>
                       <tr style={{color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'left', borderBottom:'1px solid var(--glass-border)'}}>
                         <th style={{padding:'14px 16px'}}>Sembol</th><th>Şirket</th><th>Puan</th><th>Fiyat</th><th>F/K</th><th>PD/DD</th><th>FD/FAVÖK</th><th>Satış YoY</th><th>Net Kâr YoY</th>
@@ -1871,30 +1909,30 @@ export default function App() {
 
           {/* FUND CREATOR VIEW */}
           {activeTab === 'fund' && (
-            <section className="animated-fade-in" style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Briefcase size={28} color="var(--accent-primary)" /> 
+            <section className="animated-fade-in" style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32, maxWidth: '800px', margin: '0 auto' }}>
+              <h3 style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Briefcase size={isMobile ? 22 : 28} color="var(--accent-primary)" />
                 AI ile Yatırım Fonu Oluştur
               </h3>
               <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.6', fontSize: '1.05rem' }}>
                 Yatırım hedefini veya ilgilendiğin temayı belirt (örn: "Temettü emekliliği", "Teknoloji odaklı büyüme"). Yapay zeka sana özel BIST hisselerinden oluşan bir sepet çıkarsın.
               </p>
-              
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Fon hedefini yaz..." 
+
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px', marginBottom: '32px' }}>
+                <input
+                  type="text"
+                  placeholder="Fon hedefini yaz..."
                   value={fundThemeInput}
                   onChange={(e) => setFundThemeInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && generateAiFund()}
-                  style={{ flex: 1, padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.1rem', outline: 'none' }}
+                  style={{ flex: 1, padding: '14px 18px', borderRadius: '12px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
                 />
-                <button 
+                <button
                   onClick={generateAiFund}
                   disabled={fundLoading || !fundThemeInput.trim()}
-                  style={{ backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '12px', padding: '0 32px', fontWeight: 700, fontSize: '1.05rem', cursor: fundLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: fundLoading ? 0.7 : 1 }}
+                  style={{ backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '12px', padding: isMobile ? '14px' : '0 32px', fontWeight: 700, fontSize: '1.05rem', cursor: fundLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: fundLoading ? 0.7 : 1 }}
                 >
-                  {fundLoading && <Loader2 className="spinner" size={20} />} 
+                  {fundLoading && <Loader2 className="spinner" size={20} />}
                   Oluştur
                 </button>
               </div>
@@ -1912,8 +1950,8 @@ export default function App() {
           {/* STOCK ANALYSIS VIEW */}
           {data && !loading && !error && activeTab !== 'fund' && activeTab !== 'watchlist' && activeTab !== 'agenda' && activeTab !== 'assistant' && activeTab !== 'portfolio' && activeTab !== 'backtest' && activeTab !== 'heatmap' && activeTab !== 'global' && activeTab !== 'screener' && activeTab !== 'alerts' && activeTab !== 'macro' && (
             <div className="animated-fade-in">
-              <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px', marginBottom: '24px', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px' }}>
+              <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32, marginBottom: '24px', position: 'relative' }}>
+                <div style={{ position: isMobile ? 'static' : 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: isMobile ? 16 : 0, justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
                   <button onClick={() => window.print()} style={{ backgroundColor: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     PDF İndir
                   </button>
@@ -2005,13 +2043,13 @@ export default function App() {
                           <span style={{fontSize:'1.2rem', color:'var(--text-muted)'}}>/ 10</span>
                         </div>
                       </div>
-                      <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8}}>
+                      <div style={{display:'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: isMobile ? 12 : 8}}>
                         {sc.breakdown.map((b,i) => {
                           const pct = (b.points / b.max) * 100;
                           const segColor = pct >= 75 ? 'var(--accent-primary)' : pct >= 50 ? '#f59e0b' : 'var(--accent-negative)';
                           return (
                             <div key={i} title={`${b.label}: ${b.note}`}>
-                              <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginBottom:4, textAlign:'center', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{b.label}</div>
+                              <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginBottom:4, textAlign:'center', whiteSpace: isMobile ? 'normal' : 'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{b.label}</div>
                               <div style={{height:6, backgroundColor:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden'}}>
                                 <div style={{width:`${pct}%`, height:'100%', backgroundColor:segColor}} />
                               </div>
@@ -2023,7 +2061,7 @@ export default function App() {
                     </div>
                   );
                 })()}
-                <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
                   <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '8px', flex: 1 }}>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Satış Büyümesi (Yıllık)</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700, color: data.scorecard?.revenueGrowthYoY && data.scorecard.revenueGrowthYoY > 0 ? 'var(--accent-primary)' : 'var(--accent-negative)' }}>
@@ -2051,7 +2089,7 @@ export default function App() {
                       <Briefcase size={20} color="var(--accent-primary)" />
                       Temettü Geçmişi (Son 5 Yıl)
                     </h3>
-                    <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:24}}>
+                    <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: isMobile ? 16 : 24}}>
                       <div style={{backgroundColor:'rgba(255,255,255,0.02)', padding:20, borderRadius:12, border:'1px solid var(--glass-border)'}}>
                         <div style={{maxHeight:240, overflowY:'auto'}}>
                           {dividends.map((d, i) => (
@@ -2086,7 +2124,7 @@ export default function App() {
                       <Activity size={20} color="var(--accent-primary)" />
                       Teknik Analiz Göstergeleri
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
                       <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px', display:'flex', alignItems:'center' }}>RSI (14) Göstergesi <InfoTooltip content={GLOSSARY.rsi} /></div>
                         <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>
@@ -2115,12 +2153,12 @@ export default function App() {
 
               </section>
 
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '16px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 {(['quarterly', 'annual', 'charts', 'ai', 'compare'] as const).map(tab => (
-                  <button 
+                  <button
                     key={tab}
-                    onClick={() => setActiveTab(tab)} 
-                    style={{ backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'transparent', color: activeTab === tab ? '#000' : 'var(--text-muted)', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                    onClick={() => setActiveTab(tab)}
+                    style={{ backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'transparent', color: activeTab === tab ? '#000' : 'var(--text-muted)', border: 'none', padding: isMobile ? '8px 14px' : '10px 20px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0, whiteSpace: 'nowrap', fontSize: isMobile ? '0.9rem' : '1rem' }}
                   >
                     {tab === 'quarterly' ? 'Çeyreklik' : tab === 'annual' ? 'Yıllık' : tab === 'charts' ? 'Grafikler' : tab === 'ai' ? 'AI Analiz' : tab === 'compare' ? 'Karşılaştır' : 'KAP Bildirimleri'}
                   </button>
@@ -2128,8 +2166,8 @@ export default function App() {
               </div>
 
               {(activeTab === 'quarterly' || activeTab === 'annual') && (
-                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '24px', overflowX: 'auto' }}>
-                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 12 : 24, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: isMobile ? 480 : 'auto' }}>
                     <thead>
                       <tr>
                         <th style={{ padding: '16px', color: 'var(--text-muted)', borderBottom: '1px solid var(--glass-border)' }}>Kalem</th>
@@ -2169,7 +2207,7 @@ export default function App() {
               )}
 
               {activeTab === 'ai' && (
-                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px', lineHeight: '1.6' }}>
+                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32, lineHeight: '1.6' }}>
                   {aiLoading ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-primary)' }}>
                       <Loader2 className="spinner" size={24} /> Yapay Zeka analiz ediyor...
@@ -2202,16 +2240,16 @@ export default function App() {
               )}
 
               {activeTab === 'compare' && (
-                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px' }}>
+                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32 }}>
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', position: 'relative' }} ref={compareRef}>
-                    <input 
+                    <input
                       value={compareInput}
                       onChange={handleCompareSearch}
                       placeholder="Karşılaştırmak için hisse ekle..."
                       style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
                     />
                     {compareSuggestions.length > 0 && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: '100px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '8px', marginTop: '8px', zIndex: 50 }}>
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: isMobile ? 0 : '100px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '8px', marginTop: '8px', zIndex: 50 }}>
                         {compareSuggestions.map(res => (
                           <ClickableCard key={res.ticker} onActivate={() => addCompareStock(res.ticker)} ariaLabel={`${res.ticker} ekle`} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--glass-border)' }}>
                             <strong>{res.ticker}</strong> - {res.name}
@@ -2259,7 +2297,7 @@ export default function App() {
               
 
               {activeTab === 'kap' && (
-                <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
+                <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding: isMobile ? 16 : 32}}>
                   <h3 style={{fontSize:'1.3rem', fontWeight:800, marginBottom:24, display:'flex', alignItems:'center', gap:12}}>
                     <Activity size={20} color="var(--accent-primary)" />
                     {data.ticker} — KAP Bildirimleri
@@ -2291,10 +2329,10 @@ export default function App() {
 
               {activeTab === 'charts' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:32}}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
-                      <h3 style={{fontSize:'1.2rem', fontWeight:700}}>{data.ticker} Fiyat Geçmişi</h3>
-                      <div style={{display:'flex', gap:8, marginRight:16}}>
+                  <section style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding: isMobile ? 16 : 32}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, flexWrap:'wrap', gap:12}}>
+                      <h3 style={{fontSize:'1.2rem', fontWeight:700, width: isMobile ? '100%' : 'auto'}}>{data.ticker} Fiyat Geçmişi</h3>
+                      <div style={{display:'flex', gap:8, marginRight: isMobile ? 0 : 16, flexWrap:'wrap'}}>
                         <button onClick={() => setChartType('candle')}
                           style={{padding:'6px 14px', borderRadius:6, border:'none',
                             backgroundColor: chartType === 'candle' ? 'var(--accent-primary)' : 'transparent',
@@ -2310,7 +2348,7 @@ export default function App() {
                           Çizgi
                         </button>
                       </div>
-                      <div style={{display:'flex', gap:8}}>
+                      <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
                         {(['1m','3m','6m','1y','5y'] as const).map(r => (
                           <button key={r} onClick={() => setPriceRange(r)}
                             style={{padding:'6px 14px', borderRadius:6, border:'none',
@@ -2344,11 +2382,11 @@ export default function App() {
                       <div style={{color:'var(--text-muted)', padding:60, textAlign:'center'}}>Fiyat verisi yükleniyor...</div>
                     )}
                   </section>
-                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: '32px' }}>
+                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32 }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '24px' }}>Gelir Büyümesi (Yıllık)</h3>
-                  <div style={{ width: '100%', height: '400px' }}>
+                  <div style={{ width: '100%', height: isMobile ? 300 : 400 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <RechartsBar data={data.annual.slice().reverse()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <RechartsBar data={data.annual.slice().reverse()} margin={{ top: 20, right: isMobile ? 10 : 30, left: isMobile ? 0 : 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                         <XAxis dataKey="periodLabel" stroke="var(--text-muted)" />
                         <YAxis stroke="var(--text-muted)" tickFormatter={(v) => (v / 1e9).toFixed(1) + ' Mlr ₺'} />
@@ -2368,16 +2406,16 @@ export default function App() {
       </div>
 
       {/* FLOATING AI ASSISTANT WIDGET */}
-      <Draggable bounds="body" handle=".drag-handle">
+      <Draggable bounds="body" handle=".drag-handle" disabled={isMobile}>
         <div style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
+          bottom: isMobile ? '16px' : '24px',
+          right: isMobile ? '16px' : '24px',
           zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
-          gap: '16px'
+          gap: '12px'
         }}>
           {isAssistantOpen && (
             <div className="animated-fade-in" style={{
@@ -2459,9 +2497,10 @@ export default function App() {
           
           <button
             onClick={() => setIsAssistantOpen(prev => !prev)}
+            aria-label={isAssistantOpen ? 'Asistanı kapat' : 'AI asistanı aç'}
             style={{
-              width: '64px',
-              height: '64px',
+              width: isMobile ? 52 : 64,
+              height: isMobile ? 52 : 64,
               borderRadius: '50%',
               backgroundColor: 'var(--accent-primary)',
               color: '#000',
@@ -2475,7 +2514,7 @@ export default function App() {
               transform: isAssistantOpen ? 'scale(0.9)' : 'scale(1)'
             }}
           >
-            {isAssistantOpen ? <X size={32} /> : <Sparkles size={32} />}
+            {isAssistantOpen ? <X size={isMobile ? 26 : 32} /> : <Sparkles size={isMobile ? 26 : 32} />}
           </button>
         </div>
       </Draggable>
@@ -2483,7 +2522,7 @@ export default function App() {
   );
 }
 
-function AddPositionForm({onAdd}: {onAdd: (p: any) => void}) {
+function AddPositionForm({onAdd, isMobile = false}: {onAdd: (p: any) => void; isMobile?: boolean}) {
   const [ticker, setTicker] = useState('');
   const [lots, setLots] = useState('');
   const [price, setPrice] = useState('');
@@ -2498,41 +2537,42 @@ function AddPositionForm({onAdd}: {onAdd: (p: any) => void}) {
     setTicker(''); setLots(''); setPrice('');
   };
   return (
-    <div style={{display:'flex', gap:12, marginBottom:24, padding:20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
+    <div style={{display:'flex', flexDirection: isMobile ? 'column' : 'row', gap:12, marginBottom:24, padding: isMobile ? 16 : 20, backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)'}}>
       <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="Sembol (THYAO)"
-        style={{flex:1, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
+        style={{flex: isMobile ? 'none' : 1, width: isMobile ? '100%' : 'auto', padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)', boxSizing:'border-box'}} />
       <input value={lots} onChange={e => setLots(e.target.value)} placeholder="Lot adedi" type="number"
-        style={{width:120, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
+        style={{width: isMobile ? '100%' : 120, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)', boxSizing:'border-box'}} />
       <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Alış fiyatı ₺" type="number"
-        style={{width:140, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)'}} />
+        style={{width: isMobile ? '100%' : 140, padding:'10px 14px', borderRadius:8, border:'1px solid var(--glass-border)', backgroundColor:'var(--bg-main)', color:'var(--text-main)', boxSizing:'border-box'}} />
       <button onClick={submit} disabled={!ticker || !lots || !price}
-        style={{padding:'10px 24px', borderRadius:8, border:'none', backgroundColor:'var(--accent-primary)', color:'#000', fontWeight:700, cursor:'pointer'}}>
+        style={{padding:'10px 24px', borderRadius:8, border:'none', backgroundColor:'var(--accent-primary)', color:'#000', fontWeight:700, cursor:'pointer', width: isMobile ? '100%' : 'auto'}}>
         Pozisyon Ekle
       </button>
     </div>
   );
 }
 
-function PortfolioTable({portfolio, prices, onRemove, onDownload}: {portfolio: any[]; prices: Record<string, number>; onRemove: (i: number) => void; onDownload: () => void}) {
+function PortfolioTable({portfolio, prices, onRemove, onDownload, isMobile = false}: {portfolio: any[]; prices: Record<string, number>; onRemove: (i: number) => void; onDownload: () => void; isMobile?: boolean}) {
   const totalCost = portfolio.reduce((s, p) => s + p.lots * p.entryPrice, 0);
   const totalValue = portfolio.reduce((s, p) => s + p.lots * (prices[p.ticker] || p.entryPrice), 0);
   const totalPL = totalValue - totalCost;
   const totalPLPct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
   return (
-    <div style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding:24}}>
-      <div style={{display:'flex', justifyContent:'space-between', marginBottom:20, paddingBottom:20, borderBottom:'1px solid var(--glass-border)'}}>
-        <div style={{display:'flex', gap:32}}>
-          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Toplam Maliyet</div><div style={{fontSize:'1.4rem', fontWeight:700}}>{totalCost.toFixed(2)} ₺</div></div>
-          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Güncel Değer</div><div style={{fontSize:'1.4rem', fontWeight:700}}>{totalValue.toFixed(2)} ₺</div></div>
+    <div style={{backgroundColor:'var(--bg-card)', borderRadius:12, border:'1px solid var(--glass-border)', padding: isMobile ? 16 : 24}}>
+      <div style={{display:'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent:'space-between', marginBottom:20, paddingBottom:20, borderBottom:'1px solid var(--glass-border)', gap: isMobile ? 16 : 0}}>
+        <div style={{display:'flex', gap: isMobile ? 16 : 32, flexWrap:'wrap'}}>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Toplam Maliyet</div><div style={{fontSize: isMobile ? '1.1rem' : '1.4rem', fontWeight:700}}>{totalCost.toFixed(2)} ₺</div></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Güncel Değer</div><div style={{fontSize: isMobile ? '1.1rem' : '1.4rem', fontWeight:700}}>{totalValue.toFixed(2)} ₺</div></div>
           <div><div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Kâr/Zarar</div>
-            <div style={{fontSize:'1.4rem', fontWeight:800, color: totalPL >= 0 ? 'var(--accent-primary)' : 'var(--accent-negative)'}}>
+            <div style={{fontSize: isMobile ? '1.1rem' : '1.4rem', fontWeight:800, color: totalPL >= 0 ? 'var(--accent-primary)' : 'var(--accent-negative)'}}>
               {totalPL >= 0 ? '+' : ''}{totalPL.toFixed(2)} ₺ ({totalPL >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}%)
             </div>
           </div>
         </div>
-        <button onClick={onDownload} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'var(--text-main)', cursor:'pointer'}}>Portföyü CSV İndir</button>
+        <button onClick={onDownload} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'var(--text-main)', cursor:'pointer', alignSelf: isMobile ? 'stretch' : 'center'}}>Portföyü CSV İndir</button>
       </div>
-      <table style={{width:'100%'}}>
+      <div style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch'}}>
+      <table style={{width:'100%', minWidth: isMobile ? 480 : 'auto'}}>
         <thead><tr style={{color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'left'}}>
           <th style={{padding:'12px 8px'}}>Sembol</th><th>Lot</th><th>Giriş</th><th>Güncel</th><th>K/Z</th><th></th>
         </tr></thead>
@@ -2556,6 +2596,7 @@ function PortfolioTable({portfolio, prices, onRemove, onDownload}: {portfolio: a
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
