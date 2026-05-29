@@ -64,6 +64,21 @@ Generate a brief 1-2 sentence summary of this answer.`;
   }
 
   /**
+   * Seeds completed turns directly into history without LLM summarization.
+   * Useful when hydrating history from the client.
+   */
+  seedCompletedTurns(turns: { query: string; answer: string }[]): void {
+    for (const t of turns) {
+      this.messages.push({
+        id: this.messages.length,
+        query: t.query,
+        answer: t.answer,
+        summary: t.answer
+      });
+    }
+  }
+
+  /**
    * Saves a new user query to history immediately (before answer is available).
    */
   saveUserQuery(query: string): void {

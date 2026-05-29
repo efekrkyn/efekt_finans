@@ -58,6 +58,10 @@ export interface AgentConfig {
   memoryEnabled?: boolean;
   /** Message queue for mid-run injection of new user messages. */
   messageQueue?: MessageQueue;
+  /** Additional tools specifically injected for this agent instance */
+  extraTools?: import('@langchain/core/tools').StructuredToolInterface[];
+  /** Concurrency safe map for extra tools */
+  extraToolsConcurrency?: Map<string, boolean>;
 }
 
 /**

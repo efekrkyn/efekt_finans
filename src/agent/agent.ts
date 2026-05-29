@@ -71,8 +71,12 @@ export class Agent {
 
   static async create(config: AgentConfig = {}): Promise<Agent> {
     const model = config.model ?? DEFAULT_MODEL;
-    const tools = getTools(model);
+    const baseTools = getTools(model);
+    const tools = [...baseTools, ...(config.extraTools ?? [])];
     const concurrencyMap = getToolConcurrencyMap(model);
+    for (const t of config.extraTools ?? []) {
+      concurrencyMap.set(t.name, config.extraToolsConcurrency?.get(t.name) ?? false);
+    }
     const soulContent = await loadSoulDocument();
     const rulesContent = await loadRulesDocument();
     let memoryFiles: string[] = [];

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Draggable from 'react-draggable';
 import { 
   Search, ArrowUpRight, Activity, TrendingUp, Download, Briefcase, 
-  ChevronRight, BarChart, Bell, BellRing, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2, X } from 'lucide-react';
+  ChevronRight, BarChart, Bell, BellRing, User, LayoutGrid, Calendar, List, MessageSquare, Menu, Sun, Moon, Monitor, BrainCircuit, Sparkles, Loader2, X, Trash2 } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as RechartsBar, Bar, LineChart, Line } from 'recharts';
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
@@ -194,9 +194,26 @@ export default function App() {
   // AI Assistant State
   const [aiChatModel, setAiChatModel] = useState('deepseek-v4-pro');
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [assistantMessages, setAssistantMessages] = useState<{role: 'user'|'assistant'|'system', content: string}[]>([
-    { role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' }
-  ]);
+  const CHAT_KEY = 'efekt-chat-history';
+  const CHAT_MAX_TURNS = 20;
+  const DEFAULT_SYSTEM_MSG: {role: 'user'|'assistant'|'system', content: string} = { role: 'system', content: 'Merhaba! Ben Efekt AI. BIST hisseleri hakkında analiz, karşılaştırma veya fon oluşturma konularında sana yardımcı olabilirim.' };
+
+  const [assistantMessages, setAssistantMessages] = useState<{role: 'user'|'assistant'|'system', content: string}[]>(() => {
+    const saved = safeLocalStorage.getItem(CHAT_KEY);
+    if (!saved) return [DEFAULT_SYSTEM_MSG];
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : [DEFAULT_SYSTEM_MSG];
+    } catch {
+      return [DEFAULT_SYSTEM_MSG];
+    }
+  });
+
+  useEffect(() => {
+    const system = assistantMessages.find(m => m.role === 'system') ?? DEFAULT_SYSTEM_MSG;
+    const turns = assistantMessages.filter(m => m.role !== 'system').slice(-CHAT_MAX_TURNS);
+    safeLocalStorage.setItem(CHAT_KEY, JSON.stringify([system, ...turns]));
+  }, [assistantMessages]);
   const [assistantInput, setAssistantInput] = useState('');
   const [isAssistantTyping, setIsAssistantTyping] = useState(false);
   const [assistantStatus, setAssistantStatus] = useState('');
@@ -946,6 +963,10 @@ export default function App() {
     setAssistantMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
+      const portfolioDetail = portfolio.length
+        ? portfolio.map(p => `${p.ticker} x${p.lots}${p.entryPrice ? ` (ort ${p.entryPrice} TL)` : ''}`).join(', ')
+        : 'boş';
+
       const contextStr = `Mevcut Ekran: ${activeTab === 'quarterly' ? data?.ticker + ' Hisse Detayı' : activeTab}\n` + 
                          (data ? `Açık Hisse Verisi: ${JSON.stringify({
                             ticker: data.ticker, 
@@ -954,12 +975,17 @@ export default function App() {
                             bilancoPuanlari: data.scorecard
                          })}\n` : '') +
                          `İzleme Listesi: ${watchlist.join(', ')}\n` +
-                         `Portföy: ${portfolio.map(p => p.ticker).join(', ')}`;
+                         `Portföy: ${portfolioDetail}`;
+
+      const history = assistantMessages
+        .filter(m => m.role !== 'system' && m.content.trim() !== '')
+        .slice(-CHAT_MAX_TURNS)
+        .map(m => ({ role: m.role, content: m.content }));
 
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, sessionId, model: aiChatModel, context: contextStr })
+        body: JSON.stringify({ query, history, sessionId, model: aiChatModel, context: contextStr })
       });
 
       if (!response.body) throw new Error('No body');
@@ -983,22 +1009,36 @@ export default function App() {
           if (!payload) continue;
           
           try {
-            const data = JSON.parse(payload);
-            if (data.type === 'thinking') {
-              setAssistantStatus(`Düşünüyor: ${data.message}`);
-            } else if (data.type === 'tool_start') {
-              setAssistantStatus(`Araç kullanılıyor: ${data.tool}`);
-            } else if (data.type === 'done') {
+            const parsed = JSON.parse(payload);
+            if (parsed.type === 'thinking') {
+              setAssistantStatus(`Düşünüyor: ${parsed.message}`);
+            } else if (parsed.type === 'tool_start') {
+              setAssistantStatus(`Araç kullanılıyor: ${parsed.tool}`);
+            } else if (parsed.type === 'tool_action' && parsed.action === 'open-tab') {
+              const { tab, ticker, discountRate, tickers } = parsed;
+              if (tab === 'derinrapor') {
+                setActiveTab('derinrapor');
+                if (ticker) loadStock(ticker);
+                if (discountRate) setDiscountRate(discountRate * 100);
+              } else if (tab === 'compare') {
+                setActiveTab('compare');
+                if (tickers && tickers.length > 0) loadStock(tickers[0]);
+              } else if (tab === 'portfolio') {
+                setActiveTab('portfolio');
+              } else if (tab === 'kap') {
+                setActiveTab('kap');
+              }
+            } else if (parsed.type === 'done') {
               setAssistantMessages(prev => {
                 const newMsgs = [...prev];
-                newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: data.answer || '' };
+                newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: parsed.answer || '' };
                 return newMsgs;
               });
               setAssistantStatus('');
-            } else if (data.type === 'error') {
+            } else if (parsed.type === 'error') {
               setAssistantMessages(prev => {
                 const newMsgs = [...prev];
-                newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: `Hata: ${data.error}` };
+                newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: `Hata: ${parsed.error}` };
                 return newMsgs;
               });
               setAssistantStatus('');
@@ -2723,8 +2763,8 @@ export default function App() {
                     <option value="deepseek-v4-pro">Pro</option>
                     <option value="deepseek-v4-flash">Fast</option>
                   </select>
-                  <button onClick={() => setAssistantMessages([{ role: 'system', content: 'Merhaba! Ben Efekt AI. Şu an bulunduğun sayfadaki hisseleri ve verileri görüyorum. Nasıl yardımcı olabilirim?' }])} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }} title="Sohbeti Temizle">
-                    <Loader2 size={16} />
+                  <button onClick={() => setAssistantMessages([DEFAULT_SYSTEM_MSG])} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }} title="Sohbeti Temizle">
+                    <Trash2 size={16} />
                   </button>
                   <button onClick={() => setIsAssistantOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}>
                     <X size={20} />

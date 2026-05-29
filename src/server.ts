@@ -1355,9 +1355,10 @@ Markdown formatında hazırla.
       return new Response(new ReadableStream({
         async start(controller) {
           try {
-            const body = await req.json() as { query?: string, sessionId?: string, model?: string, context?: string };
+            const body = await req.json() as { query?: string, sessionId?: string, model?: string, context?: string, history?: { role: string, content: string }[] };
             const query = body.query;
             const contextStr = body.context;
+            const historyData = body.history;
             const sessionId = body.sessionId || 'default';
             const selectedModel = body.model || 'deepseek-v4-pro';
             if (!query) {
@@ -1366,20 +1367,25 @@ Markdown formatında hazırla.
               return;
             }
 
-            const finalQuery = contextStr ? `[EK BİLGİ - Kullanıcının Ekranındaki Veriler:\n${contextStr}]\n\nKullanıcı Sorusu: ${query}` : query;
+            const actionPrompt = `[DASHBOARD AKSİYONLARI] Kullanıcı NET olarak isterse şu tool'ları çağır: open_deep_report (derin DCF raporu), open_compare (2+ hisse kıyas), open_portfolio_analysis (portföy), open_kap_news (günün KAP). Belirsizse çağırma, sor.`;
+            const finalQuery = contextStr ? `[EK BİLGİ - Kullanıcının Ekranındaki Veriler:\n${contextStr}]\n\n${actionPrompt}\n\nKullanıcı Sorusu: ${query}` : `${actionPrompt}\n\nKullanıcı Sorusu: ${query}`;
 
-            if (!chatSessions[sessionId]) {
-              chatSessions[sessionId] = new InMemoryChatHistory(selectedModel, 15);
+            const { pairChatMessages } = await import('./utils/chat-history-seed');
+            const history = new InMemoryChatHistory(selectedModel, 15);
+            if (Array.isArray(historyData)) {
+              history.seedCompletedTurns(pairChatMessages(historyData));
             }
-            const history = chatSessions[sessionId];
             touchSession(sessionId);
             
-            // Lazy import — agent zinciri ağır (langchain + tools/registry) ve
-            // sadece bu endpoint için lazım.
+            // Lazy import
             const { Agent } = await import('./agent/agent');
+            const { DASHBOARD_ACTION_TOOLS, DASHBOARD_ACTION_TOOL_NAMES } = await import('./tools/dashboard/index');
+            const { mapActionEvent } = await import('./utils/dashboard-action-event');
+
             const agent = await Agent.create({
               model: selectedModel,
-              memoryEnabled: false // Disable vector DB memory (memory_search) which takes too long, keep chat history only.
+              memoryEnabled: false,
+              extraTools: DASHBOARD_ACTION_TOOLS,
             });
             let fullAnswer = '';
 
@@ -1388,6 +1394,12 @@ Markdown formatında hazırla.
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'thinking', message: event.message })}\n\n`));
               } else if (event.type === 'tool_start') {
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'tool_start', tool: event.tool, args: event.args })}\n\n`));
+                if (DASHBOARD_ACTION_TOOL_NAMES.has(event.tool)) {
+                  const actionEvent = mapActionEvent(event.tool, event.args);
+                  if (actionEvent) {
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(actionEvent)}\n\n`));
+                  }
+                }
               } else if (event.type === 'done') {
                 fullAnswer = event.answer || '';
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'done', answer: event.answer })}\n\n`));
@@ -1396,11 +1408,6 @@ Markdown formatında hazırla.
               }
             }
 
-            // Save history
-            history.saveUserQuery(query);
-            if (fullAnswer) {
-              await history.saveAnswer(fullAnswer);
-            }
 
             controller.close();
           } catch (err: any) {
