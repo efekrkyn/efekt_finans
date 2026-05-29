@@ -4,7 +4,7 @@ import { fetchIsYatirimQuote } from './utils/isyatirim';
 import { getReportBundle } from './utils/report-data';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check';
-import { yahooFinance as yf, yahooFinance } from './utils/yahoo';
+import { fmpClient } from './utils/fmp.js';
 
 checkEnv();
 import { callLlm, streamLlmWithMessages } from './model/llm';
@@ -152,7 +152,8 @@ export async function fetchHandler(req: Request): Promise<Response> {
         const days = range === '1m' ? 30 : range === '3m' ? 90 : range === '6m' ? 180 : range === '1y' ? 365 : 1825;
         start.setDate(end.getDate() - days);
         
-        const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
+        const histResult = await fmpClient.historical(symbol, start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+        const history = { quotes: histResult?.historical?.map(h => ({ date: new Date(h.date), close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume }))?.reverse() || [] };
         const points = (history.quotes || [])
           .filter((q: any) => typeof q.close === 'number' && typeof q.open === 'number')
           .map((q: any) => ({
@@ -186,7 +187,8 @@ export async function fetchHandler(req: Request): Promise<Response> {
         const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
         const end = new Date();
         const start = new Date(); start.setDate(end.getDate() - 200);
-        const history = await yf.chart(symbol, { period1: start, period2: end, interval: '1d' });
+        const histResult = await fmpClient.historical(symbol, start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+        const history = { quotes: histResult?.historical?.map(h => ({ date: new Date(h.date), close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume }))?.reverse() || [] };
         const closes = history.quotes.map(q => q.close).filter((v): v is number => typeof v === 'number');
         const { computeTechnicalIndicators } = await import('./utils/technical-indicators');
         const bars = closes.map((c, i) => ({ date: `day${i}`, close: c }));
@@ -228,7 +230,8 @@ export async function fetchHandler(req: Request): Promise<Response> {
         
         if (isForeign) {
           
-          const quote: any = await yf.quote(ticker);
+          const quoteRes = await fmpClient.quote(ticker);
+          const quote: any = quoteRes && quoteRes.length > 0 ? quoteRes[0] : null;
           const data = {
             ticker,
             companyName: quote.longName || quote.shortName || ticker,
@@ -289,7 +292,8 @@ export async function fetchHandler(req: Request): Promise<Response> {
       if (!symbol) return new Response(JSON.stringify({error:'symbol zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       try {
         
-        const quote: any = await yf.quote(symbol);
+        const quoteRes = await fmpClient.quote(symbol);
+        const quote: any = quoteRes && quoteRes.length > 0 ? quoteRes[0] : null;
         return new Response(JSON.stringify({
           ticker: symbol,
           companyName: quote.longName || quote.shortName || symbol,
@@ -659,10 +663,11 @@ Değerlerin toplamı 100 olmalı.`;
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         log('info', 'search', { query });
         
-        const searchResults = await yahooFinance.search(query, {
-          quotesCount: 8,
-          newsCount: 0,
-        });
+        const searchResultsRes = await fmpClient.search(query, 'istanbul', 20);
+        // Map to Yahoo Finance shape to avoid breaking LLM prompts
+        const searchResults = {
+          quotes: searchResultsRes.map(r => ({ symbol: r.symbol, shortname: r.name, longname: r.name, exchange: r.exchangeShortName }))
+        };
 
         const allResults = (searchResults.quotes || [])
           .filter((q: any) => typeof q?.symbol === 'string')
@@ -805,7 +810,8 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         
         const end = new Date();
         const start = new Date(); start.setFullYear(end.getFullYear() - 5);
-        const result: any = await yf.chart(symbol, { period1: start, period2: end, interval: '1d', events: 'div' });
+        const divResult = await fmpClient.dividends(symbol);
+        const result: any = { events: { dividends: divResult?.historical?.reduce((acc: any, d: any) => { acc[new Date(d.date).getTime()/1000] = { amount: d.adjDividend }; return acc; }, {}) || {} } };
         const dividends = (result.events?.dividends || []).map((d: any) => ({
           date: d.date,
           amount: d.amount
@@ -872,21 +878,22 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         const quotes = await Promise.all(
           bist30Symbols.map(async (sym) => {
             const bare = sym.replace('.IS','');
-            // 1) Yahoo dene (hızlı, isim + anlık değişim verir)
+            // 1) FMP dene
             try {
-              const q = await yahooFinance.quote(sym);
-              if (q && q.regularMarketPrice) {
+              const qRes = await fmpClient.quote(sym);
+              const q: any = qRes && qRes.length > 0 ? qRes[0] : null;
+              if (q && q.price) {
                 return {
                   ticker: bare,
-                  companyName: q.shortName || bare,
-                  change: q.regularMarketChangePercent ?? 0,
-                  price: q.regularMarketPrice ?? 0,
+                  companyName: q.name || bare,
+                  change: q.changesPercentage ?? 0,
+                  price: q.price ?? 0,
                   marketCap: q.marketCap ?? 0
                 };
               }
-            } catch { /* Yahoo 429 → İş Yatırım fallback */ }
+            } catch { /* FMP fallback */ }
 
-            // 2) İş Yatırım fallback (rate-limit'siz, Türk borsası)
+            // 2) İş Yatırım fallback
             try {
               const iy = await fetchIsYatirimQuote(bare);
               if (iy && iy.price) {
@@ -919,13 +926,17 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         
         const tickers = ['XU100.IS', 'TRY=X', 'EURTRY=X'];
-        const promises = tickers.map(t => yahooFinance.quote(t).catch(() => null));
+        const promises = tickers.map(t => fmpClient.quote(t).catch(() => null));
         const results = await Promise.all(promises);
         
+        const validQuotes = results
+          .filter((q: any) => q && q.length > 0)
+          .map((q: any) => q[0]);
+
         const summary = {
-          xu100: results[0] ? { price: results[0].regularMarketPrice, change: results[0].regularMarketChangePercent } : null,
-          usdtry: results[1] ? { price: results[1].regularMarketPrice, change: results[1].regularMarketChangePercent } : null,
-          eurtry: results[2] ? { price: results[2].regularMarketPrice, change: results[2].regularMarketChangePercent } : null,
+          xu100: validQuotes[0] ? { price: validQuotes[0].price, change: validQuotes[0].changesPercentage } : null,
+          usdtry: validQuotes[1] ? { price: validQuotes[1].price, change: validQuotes[1].changesPercentage } : null,
+          eurtry: validQuotes[2] ? { price: validQuotes[2].price, change: validQuotes[2].changesPercentage } : null,
         };
 
         cacheSet('market-summary', summary, 1000 * 60); // 1 minute
@@ -955,12 +966,13 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
 
         
         const period1 = new Date();
-        period1.setFullYear(period1.getFullYear() - years);
-        
-        const history = await yahooFinance.historical(ticker + '.IS', {
-          period1: period1,
-          interval: '1d'
-        });
+        const start = new Date(); start.setDate(start.getDate() - (years * 365));
+        const histResult = await fmpClient.historical(
+          ticker + '.IS',
+          start.toISOString().split('T')[0],
+          new Date().toISOString().split('T')[0]
+        );
+        const history = histResult?.historical || [];
 
         if (!history || history.length === 0) throw new Error('Veri bulunamadı.');
 
@@ -972,14 +984,12 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         const initialPrice = history[0].close;
         const baselineShares = initialCapital / initialPrice;
 
-        let smas = [];
+        let smas: any[] = [];
         if (strategy === 'sma') {
            for (let i = 0; i < history.length; i++) {
-             const slice20 = history.slice(Math.max(0, i-20), i+1);
-             const slice50 = history.slice(Math.max(0, i-50), i+1);
-             const sma20 = slice20.reduce((s, d) => s + d.close, 0) / slice20.length;
-             const sma50 = slice50.reduce((s, d) => s + d.close, 0) / slice50.length;
-             smas.push({ sma20, sma50 });
+             const sma50 = history.slice(Math.max(0, i-50), i+1).reduce((s: number, d: any) => s + d.close, 0) / Math.min(50, i+1);
+             const sma200 = history.slice(Math.max(0, i-200), i+1).reduce((s: number, d: any) => s + d.close, 0) / Math.min(200, i+1);
+             smas.push({ sma200, sma50 });
            }
         }
 
@@ -1043,7 +1053,8 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
             
             const enrichedPortfolio = await Promise.all(portfolio.map(async (p: any) => {
                try {
-                 const q = await yahooFinance.quote(p.ticker + '.IS');
+                 const qRes = await fmpClient.quote(p.ticker + '.IS');
+                 const q: any = qRes && qRes.length > 0 ? qRes[0] : null;
                  return { ...p, currentPrice: q.regularMarketPrice, companyName: q.shortName };
                } catch(e) {
                  return p;

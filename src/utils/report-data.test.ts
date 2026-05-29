@@ -3,8 +3,8 @@ import { mapTier, deriveStance, deriveTargetRange } from './report-data';
 import type { DcfResult } from './dcf';
 
 describe('mapTier', () => {
-  test('yahoo → tam', () => {
-    expect(mapTier('yahoo')).toBe('tam');
+  test('fmp → tam', () => {
+    expect(mapTier('fmp')).toBe('tam');
   });
   test('isyatirim-fallback → kısıtlı', () => {
     expect(mapTier('isyatirim-fallback')).toBe('kısıtlı');
