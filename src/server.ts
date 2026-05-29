@@ -1106,10 +1106,10 @@ Raporunu Markdown formatında şu başlıklarla hazırla:
         const prompt = `Sen finansal bir duyarlılık analizi yapan yapay zekasın. Yalnızca JSON formatında yanıt verirsin. Aşağıda ${ticker} hissesiyle ilgili internetten toplanan son güncel haberler ve yorumlar yer almaktadır:\n\n${searchResults}\n\nYukarıdaki metni analiz et ve yatırımcıların bu hisse hakkındaki genel hissiyatını bul. JSON formatında şu anahtarları içeren bir yanıt döndür:\n- score (0 ile 100 arası bir sayı. 0 tam panik/negatif, 100 tam coşku/pozitif, 50 nötr)\n- summary (Bu skorun nedenini açıklayan 2-3 cümlelik çok net bir özet.)\n\nSADECE JSON YANITI VER, BAŞKA METİN YAZMA. Örn: {"score": 75, "summary": "Şirketin aldığı yeni ihaleler yatırımcılar arasında pozitif karşılandı."}`;
         
         const result = await callLlm(prompt, { model: 'deepseek-chat' });
-        const responseText = typeof result.response === 'string'
-          ? result.response
+        const responseText = typeof result.response === 'string' 
+          ? result.response 
           : (result.response as any)?.content ?? String(result.response);
-
+        
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
 
