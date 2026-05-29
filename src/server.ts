@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { fetchBISTData } from './utils/bist-data';
 import { fetchIsYatirimQuote } from './utils/isyatirim';
+import { getReportBundle } from './utils/report-data';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check';
 import { yahooFinance as yf, yahooFinance } from './utils/yahoo';
@@ -405,6 +406,198 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
           'Connection': 'keep-alive',
           'Access-Control-Allow-Origin': '*'
         }
+      });
+    }
+
+    // 1.6b API: Derin Rapor — deterministik DCF + hedef fiyat + duruş (sayılar kodda, LLM sadece düzyazı)
+    if (path === '/api/deep-report') {
+      const ticker = url.searchParams.get('ticker');
+      if (!ticker) {
+        return new Response(JSON.stringify({ error: 'Hisse kodu (ticker) parametresi zorunludur' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+      const authErr = requireApiKey();
+      if (authErr) return authErr;
+      if (!rateLimit(req, 10, 60000)) return new Response('Rate limited', { status: 429, headers: { 'Access-Control-Allow-Origin': '*' } });
+
+      const drRaw = parseFloat(url.searchParams.get('discountRate') || '');
+      const discountRate = isFinite(drRaw) ? Math.min(0.60, Math.max(0.05, drRaw)) : 0.30;
+      const symbol = ticker.toUpperCase();
+      const cacheKey = `deep-report:${symbol}:${discountRate.toFixed(2)}`;
+
+      return new Response(new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          const send = (obj: any) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+          const done = () => controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          try {
+            const startTime = Date.now();
+            log('info', 'deep-report', { ticker: symbol, discountRate });
+
+            // Cache hit → özet + metni parçalayıp replay et
+            const cached = cacheGet(cacheKey);
+            if (cached && cached.summary && typeof cached.text === 'string') {
+              send({ summary: cached.summary });
+              const txt: string = cached.text;
+              for (let i = 0; i < txt.length; i += 400) send({ chunk: txt.slice(i, i + 400) });
+              done();
+              controller.close();
+              log('info', 'deep-report_cache_hit', { ticker: symbol });
+              return;
+            }
+
+            const bundle = await getReportBundle(symbol, { discountRate, search: searchTavily });
+
+            const humanizeTRY = (n?: number): string => {
+              if (n === undefined || n === null || !isFinite(n)) return 'Veri Yok';
+              const abs = Math.abs(n);
+              if (abs >= 1e9) return `${(n / 1e9).toFixed(2)} milyar TL`;
+              if (abs >= 1e6) return `${(n / 1e6).toFixed(2)} milyon TL`;
+              return `${n.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL`;
+            };
+            const num = (n?: number, dgt = 2): string => (typeof n === 'number' && isFinite(n) ? n.toFixed(dgt) : 'Veri Yok');
+            const pct = (n?: number): string => (typeof n === 'number' && isFinite(n) ? `${n.toFixed(1)}%` : 'Veri Yok');
+            const pctDec = (n?: number): string => (typeof n === 'number' && isFinite(n) ? `${(n * 100).toFixed(1)}%` : 'Veri Yok');
+
+            const d = bundle.dcf;
+            const tr = bundle.targetRange;
+            const summary = {
+              companyName: bundle.companyName,
+              currency: bundle.currency,
+              currentPrice: bundle.currentPrice,
+              stance: bundle.stance.label,
+              stanceRationale: bundle.stance.rationale,
+              tier: bundle.tier,
+              confidence: d.confidence,
+              fairValue: d.feasible ? d.fairValuePerShare : null,
+              upsidePct: d.feasible ? d.upsidePct : null,
+              discountRate: d.assumptions.discountRate,
+              targetLow: tr?.low ?? null,
+              targetHigh: tr?.high ?? null,
+              targetBasis: tr?.basis ?? null,
+            };
+            send({ summary });
+
+            const dcfBlock = d.feasible
+              ? `- Hesaplanabilir: EVET
+- Adil değer/hisse: ${num(d.fairValuePerShare)} TL
+- Yükseliş/düşüş potansiyeli: ${pct(d.upsidePct)}
+- İskonto oranı (kullanıcı seçimi): ${pctDec(d.assumptions.discountRate)}
+- Terminal büyüme: ${pctDec(d.assumptions.terminalGrowth)}
+- Kullanılan büyüme oranı: ${pctDec(d.assumptions.growthRate)}
+- Baz FCF: ${humanizeTRY(d.assumptions.baseFcf)} (${d.assumptions.fcfSource === 'ebitda-proxy' ? 'FAVÖK proxy' : 'raporlanmış'})
+- Terminal değerin EV içindeki payı: ${pctDec(d.assumptions.terminalValuePct)}
+- Güven: ${d.confidence}
+- Uyarılar: ${d.caveats.join(' ')}`
+              : `- Hesaplanabilir: HAYIR (yeterli finansal veri yok${bundle.tier === 'kısıtlı' ? '; yedek veri kaynağı kullanıldı' : ''})
+- Uyarılar: ${d.caveats.join(' ')}`;
+
+            const t = bundle.technicals;
+            const techBlock = t
+              ? `- RSI(14): ${num(t.rsi, 1)} (${t.rsiSignal})
+- MACD histogram: ${t.macd ? num(t.macd.histogram, 3) : 'Veri Yok'}
+- SMA20: ${num(t.sma20)} | SMA50: ${num(t.sma50)}
+- Birleşik sinyal: ${t.signal}`
+              : '- Teknik gösterge verisi yok';
+
+            const targetBlock = tr
+              ? `${num(tr.low)} – ${num(tr.high)} TL (dayanak: ${tr.basis === 'dcf' ? 'DCF duyarlılık aralığı' : '52-hafta teknik bant'})`
+              : 'Hesaplanamadı';
+
+            const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            const prompt = `Bugünün tarihi: ${today}.
+
+Aşağıda Borsa İstanbul'da işlem gören ${bundle.companyName} (${bundle.ticker}) için KODDA HESAPLANMIŞ kesin sayısal veriler var. Bu sayılar yer gerçeğidir (ground truth).
+
+ÇOK ÖNEMLİ KURALLAR:
+- Aşağıdaki sayıları AYNEN kullan. ASLA kendi sayı/oran/fiyat UYDURMA. Verilmeyen bir rakamı tahmin etme; "veri yok" de.
+- Adil değer, hedef aralık, yükseliş potansiyeli ve duruş zaten hesaplandı; bunlarla ÇELİŞME.
+- Veri katmanı "${bundle.tier}". "kısıtlı" ise tam finansal tablo yoktur; DCF atlanmış olabilir, bunu dürüstçe belirt.
+
+### PİYASA VERİLERİ
+- Güncel fiyat: ${num(bundle.currentPrice)} ${bundle.currency}
+- Piyasa değeri: ${humanizeTRY(bundle.marketCap)}
+- F/K: ${num(bundle.multiples.trailingPE)} | PD/DD: ${num(bundle.multiples.priceToBook)} | FD/FAVÖK: ${num(bundle.multiples.evToEbitda)}
+
+### BÜYÜME KARNESİ
+- Satış YoY: ${pct(bundle.scorecard.revenueGrowthYoY)} | QoQ: ${pct(bundle.scorecard.revenueGrowthQoQ)}
+- FAVÖK YoY: ${pct(bundle.scorecard.ebitdaGrowthYoY)} | QoQ: ${pct(bundle.scorecard.ebitdaGrowthQoQ)}
+- Net Kâr YoY: ${pct(bundle.scorecard.netIncomeGrowthYoY)} | QoQ: ${pct(bundle.scorecard.netIncomeGrowthQoQ)}
+
+### SON DÖNEM FİNANSALLARI ${bundle.latestFinancials ? `(${bundle.latestFinancials.periodLabel})` : ''}
+${bundle.latestFinancials ? `- Hasılat: ${humanizeTRY(bundle.latestFinancials.totalRevenue)}
+- FAVÖK: ${humanizeTRY(bundle.latestFinancials.ebitda)}
+- Net Kâr: ${humanizeTRY(bundle.latestFinancials.netIncome)}
+- Serbest Nakit Akışı: ${humanizeTRY(bundle.latestFinancials.freeCashFlow)}
+- Net Borç: ${humanizeTRY(bundle.latestFinancials.netDebt)}` : '- Finansal tablo verisi yok (yedek kaynak).'}
+
+### DCF DEĞERLEME (kodda hesaplandı)
+${dcfBlock}
+
+### 12 AYLIK HEDEF FİYAT ARALIĞI (kodda)
+${targetBlock}
+
+### TEKNİK GÖRÜNÜM (kodda)
+${techBlock}
+
+### DURUŞ (kodda): ${bundle.stance.label} — ${bundle.stance.rationale}
+
+### SON HABERLER (internet)
+${bundle.news || 'Haber bulunamadı.'}
+
+### SEKTÖR & EMSAL BAĞLAMI (internet)
+${bundle.peerContext || 'Emsal verisi bulunamadı.'}
+
+### GÖREV
+Yukarıdaki verilere dayanarak profesyonel, Türkçe, markdown bir DERİN YATIRIM RAPORU yaz. Şu bölümleri sırayla kullan:
+1. **Özet (TL;DR)** — duruş, adil değer ve hedefin tek paragraflık gerekçesi.
+2. **Finansal Sağlık** — büyüme karnesi ve son finansalların yorumu.
+3. **Değerleme** — DCF varsayımlarını (iskonto, terminal büyüme, baz FCF) açıkla; F/K, PD/DD, FD/FAVÖK çarpanlarıyla çapraz kontrol et.
+4. **Teknik Görünüm** — RSI/MACD/SMA ve birleşik sinyali yorumla.
+5. **Emsal Karşılaştırma** — sektör bağlamına göre niteliksel kıyas (uydurma rakam yok).
+6. **Haber & Katalizör** — haberlerin olası etkisi.
+7. **Boğa & Ayı Senaryosu** — her iki tarafı da güçlü biçimde savun; her senaryoda "Bu tez şu olursa yanlış: ..." cümlesi ekle.
+8. **Sonuç & Riskler** — net sonuç ve ana riskler. Sonunda mutlaka şu cümle yer alsın: "Bu rapor yatırım danışmanlığı kapsamında değildir."
+
+ÜSLUP: Profesyonel ve net. Şu kelimeleri KULLANMA: "derinlemesine, kaldıraç sağlamak, sağlam (robust), kapsamlı, kusursuz, ayrıca, üstelik". Üçlü sıralamalardan kaçın. Paragraf başına en fazla bir uzun tire (—).
+
+Raporun EN ALTINA şu satırı ekle (yalnızca bu satır markdown dışıdır):
+[SENTIMENT]: positive: <x>, neutral: <y>, negative: <z>
+Değerlerin toplamı 100 olmalı.`;
+
+            log('info', 'deep-report_llm', { ticker: symbol });
+            const stream = streamLlmWithMessages([
+              new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin. Yalnızca sana verilen kesin sayıları kullanırsın; rakam uydurmazsın.'),
+              new HumanMessage(prompt),
+            ], { model: 'deepseek-chat' });
+
+            let fullText = '';
+            for await (const chunk of stream) {
+              const content = chunk.content;
+              if (typeof content === 'string' && content) {
+                fullText += content;
+                send({ chunk: content });
+              }
+            }
+            cacheSet(cacheKey, { summary, text: fullText }, 30 * 60 * 1000);
+            done();
+            controller.close();
+            log('info', 'deep-report_done', { ticker: symbol, durationMs: Date.now() - startTime, tier: bundle.tier, dcfFeasible: d.feasible });
+          } catch (err) {
+            log('error', 'deep-report_error', { error: (err as Error).message });
+            send({ error: (err as Error).message });
+            controller.close();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
       });
     }
 

@@ -169,7 +169,7 @@ export default function App() {
     }
   }, [theme]);
 
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'|'backtest'|'alerts'|'macro'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'derinrapor'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'|'backtest'|'alerts'|'macro'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -800,6 +800,118 @@ export default function App() {
       fetchAiAnalysis(data.ticker);
     }
   }, [activeTab, data, aiAnalysis, aiLoading, error, aiError, fetchAiAnalysis]);
+
+  // ---- Derin Rapor (deterministik sayısal pipeline + LLM düzyazı) ----
+  type DeepSummary = {
+    companyName: string;
+    currency: string;
+    currentPrice: number;
+    stance: 'Pozitif' | 'Nötr' | 'Negatif';
+    stanceRationale: string;
+    tier: 'tam' | 'kısıtlı';
+    confidence: 'yüksek' | 'orta' | 'düşük';
+    fairValue: number | null;
+    upsidePct: number | null;
+    discountRate: number;
+    targetLow: number | null;
+    targetHigh: number | null;
+    targetBasis: 'dcf' | 'teknik' | null;
+  };
+  const [deepReport, setDeepReport] = useState('');
+  const [deepLoading, setDeepLoading] = useState(false);
+  const [deepError, setDeepError] = useState<string | null>(null);
+  const [deepSentiment, setDeepSentiment] = useState<{ positive: number; neutral: number; negative: number } | null>(null);
+  const [deepSummary, setDeepSummary] = useState<DeepSummary | null>(null);
+  const [discountRate, setDiscountRate] = useState(30); // yüzde (UI), backend'e /100 ondalık gönderilir
+  const deepAbortRef = useRef<AbortController | null>(null);
+
+  const fetchDeepReport = useCallback(async (ticker: string, drPercent: number) => {
+    deepAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    deepAbortRef.current = ctrl;
+    setDeepLoading(true);
+    setDeepReport('');
+    setDeepSentiment(null);
+    setDeepSummary(null);
+    setDeepError(null);
+
+    try {
+      const dr = (drPercent / 100).toFixed(2);
+      const res = await fetch(
+        `${API_BASE}/api/deep-report?ticker=${encodeURIComponent(ticker)}&discountRate=${dr}`,
+        { signal: ctrl.signal },
+      );
+      if (!res.ok) throw new Error('Derin Rapor alınamadı');
+      if (!res.body) throw new Error('Response body yok');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let buffer = '';
+      let doneFlag = false;
+
+      while (!doneFlag) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const dataStr = line.substring(6).trim();
+          if (dataStr === '[DONE]') { doneFlag = true; break; }
+          if (!dataStr) continue;
+
+          let parsed: any;
+          try { parsed = JSON.parse(dataStr); } catch { continue; }
+
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+          if (parsed.summary) {
+            setDeepSummary(parsed.summary as DeepSummary);
+          }
+          if (parsed.chunk) {
+            fullText += parsed.chunk;
+            setDeepReport(fullText);
+          }
+        }
+      }
+
+      // Sentiment ayıklama (AI Analiz ile aynı format)
+      const sentimentMatch = fullText.match(/\[SENTIMENT\]:\s*positive:\s*(\d+),\s*neutral:\s*(\d+),\s*negative:\s*(\d+)/i);
+      if (sentimentMatch) {
+        setDeepSentiment({
+          positive: parseInt(sentimentMatch[1], 10),
+          neutral: parseInt(sentimentMatch[2], 10),
+          negative: parseInt(sentimentMatch[3], 10),
+        });
+      }
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        console.error(e);
+        setDeepError(e.message || 'Derin Rapor alınamadı');
+      }
+    } finally {
+      if (deepAbortRef.current === ctrl) setDeepLoading(false);
+    }
+  }, []);
+
+  // Sekmeye girilince otomatik tetikle
+  useEffect(() => {
+    if (activeTab === 'derinrapor' && data && !deepReport && !deepLoading && !error && !deepError) {
+      fetchDeepReport(data.ticker, discountRate);
+    }
+  }, [activeTab, data, deepReport, deepLoading, error, deepError, discountRate, fetchDeepReport]);
+
+  // Ticker değişince derin rapor durumunu sıfırla
+  useEffect(() => {
+    setDeepReport('');
+    setDeepSummary(null);
+    setDeepSentiment(null);
+    setDeepError(null);
+  }, [data?.ticker]);
 
   const fundAbortRef = useRef<AbortController | null>(null);
   const generateAiFund = async () => {
@@ -2179,13 +2291,13 @@ export default function App() {
               </section>
 
               <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '16px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                {(['quarterly', 'annual', 'charts', 'ai', 'compare'] as const).map(tab => (
+                {(['quarterly', 'annual', 'charts', 'ai', 'derinrapor', 'compare'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     style={{ backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'transparent', color: activeTab === tab ? '#000' : 'var(--text-muted)', border: 'none', padding: isMobile ? '8px 14px' : '10px 20px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0, whiteSpace: 'nowrap', fontSize: isMobile ? '0.9rem' : '1rem' }}
                   >
-                    {tab === 'quarterly' ? 'Çeyreklik' : tab === 'annual' ? 'Yıllık' : tab === 'charts' ? 'Grafikler' : tab === 'ai' ? 'AI Analiz' : tab === 'compare' ? 'Karşılaştır' : 'KAP Bildirimleri'}
+                    {tab === 'quarterly' ? 'Çeyreklik' : tab === 'annual' ? 'Yıllık' : tab === 'charts' ? 'Grafikler' : tab === 'ai' ? 'AI Analiz' : tab === 'derinrapor' ? 'Derin Rapor (~30 sn)' : tab === 'compare' ? 'Karşılaştır' : 'KAP Bildirimleri'}
                   </button>
                 ))}
               </div>
@@ -2259,6 +2371,148 @@ export default function App() {
                         </div>
                       )}
                       <div>{parseMarkdown(aiAnalysis)}</div>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {activeTab === 'derinrapor' && (
+                <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32, lineHeight: '1.6' }}>
+                  {/* Üst kontrol şeridi: iskonto oranı + yeniden hesapla */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid var(--glass-border)' }}>
+                    <div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '4px' }}>Derin Rapor</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>DCF değerleme + haber + emsal sentezi</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        İskonto oranı (%)
+                        <input
+                          type="number"
+                          min={5}
+                          max={60}
+                          step={1}
+                          value={discountRate}
+                          onChange={e => {
+                            const v = parseInt(e.target.value, 10);
+                            if (!isNaN(v)) setDiscountRate(Math.min(60, Math.max(5, v)));
+                          }}
+                          disabled={deepLoading}
+                          style={{ width: '90px', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--glass-border)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 700 }}
+                        />
+                      </label>
+                      <button
+                        onClick={() => data && fetchDeepReport(data.ticker, discountRate)}
+                        disabled={deepLoading || !data}
+                        style={{ backgroundColor: 'var(--accent-primary)', color: '#000', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: 700, cursor: deepLoading ? 'not-allowed' : 'pointer', opacity: deepLoading ? 0.6 : 1 }}
+                      >
+                        {deepLoading ? 'Hesaplanıyor…' : 'Yeniden Hesapla'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {deepError ? (
+                    <div style={{ color: 'var(--accent-negative)', padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--accent-negative)' }}>
+                      <strong>Derin Rapor Hatası:</strong> {deepError}
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Sayısal özet kartı */}
+                      {deepSummary && (
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '6px' }}>Duruş</div>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '6px 14px',
+                              borderRadius: '20px',
+                              fontWeight: 800,
+                              color: deepSummary.stance === 'Pozitif' ? '#000' : 'var(--text-main)',
+                              backgroundColor:
+                                deepSummary.stance === 'Pozitif' ? 'var(--accent-primary)'
+                                : deepSummary.stance === 'Negatif' ? 'var(--accent-negative)'
+                                : 'var(--glass-border)',
+                            }}>
+                              {deepSummary.stance}
+                            </div>
+                            <div style={{ marginTop: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{deepSummary.stanceRationale}</div>
+                          </div>
+
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '6px' }}>Güncel Fiyat</div>
+                            <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+                              {deepSummary.currentPrice.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} {deepSummary.currency}
+                            </div>
+                          </div>
+
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '6px' }}>DCF Adil Değer</div>
+                            <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+                              {deepSummary.fairValue != null
+                                ? `${deepSummary.fairValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${deepSummary.currency}`
+                                : '—'}
+                            </div>
+                            {deepSummary.upsidePct != null && (
+                              <div style={{ marginTop: '4px', fontSize: '0.85rem', fontWeight: 700, color: deepSummary.upsidePct >= 0 ? 'var(--accent-primary)' : 'var(--accent-negative)' }}>
+                                {deepSummary.upsidePct >= 0 ? '+' : ''}{deepSummary.upsidePct.toFixed(1)}% potansiyel
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '6px' }}>12 Aylık Hedef Aralık</div>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                              {deepSummary.targetLow != null && deepSummary.targetHigh != null
+                                ? `${deepSummary.targetLow.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} – ${deepSummary.targetHigh.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`
+                                : '—'}
+                            </div>
+                            <div style={{ marginTop: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {deepSummary.targetBasis === 'dcf' ? 'DCF duyarlılık aralığı' : deepSummary.targetBasis === 'teknik' ? '52 haftalık fiyat bandı' : '—'}
+                            </div>
+                          </div>
+
+                          <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '6px' }}>İskonto / Güven</div>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                              %{(deepSummary.discountRate * 100).toFixed(0)} · {deepSummary.confidence}
+                            </div>
+                            <div style={{ marginTop: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Veri katmanı: {deepSummary.tier === 'tam' ? 'Tam (Yahoo)' : 'Kısıtlı (İş Yatırım)'}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sentiment */}
+                      {deepSentiment && (
+                        <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--glass-border)' }}>
+                          <h4 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '14px', color: 'var(--text-muted)' }}>Haber ve Veri Duyarlılığı</h4>
+                          <div style={{ display: 'flex', height: '14px', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' }}>
+                            <div style={{ width: `${deepSentiment.positive}%`, backgroundColor: '#10b981', transition: 'width 1s ease-in-out' }}></div>
+                            <div style={{ width: `${deepSentiment.neutral}%`, backgroundColor: '#6b7280', transition: 'width 1s ease-in-out' }}></div>
+                            <div style={{ width: `${deepSentiment.negative}%`, backgroundColor: '#ef4444', transition: 'width 1s ease-in-out' }}></div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700 }}>
+                            <span style={{ color: '#10b981' }}>● Olumlu (%{deepSentiment.positive})</span>
+                            <span style={{ color: '#6b7280' }}>● Nötr (%{deepSentiment.neutral})</span>
+                            <span style={{ color: '#ef4444' }}>● Olumsuz (%{deepSentiment.negative})</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Yükleniyor durumu */}
+                      {deepLoading && !deepReport && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-primary)' }}>
+                          <Loader2 className="spinner" size={24} /> DCF hesaplanıyor, haberler taranıyor, rapor yazılıyor… (~30 saniye)
+                        </div>
+                      )}
+
+                      {/* Markdown gövdesi */}
+                      {deepReport && (
+                        <div>
+                          {parseMarkdown(deepReport.replace(/\[SENTIMENT\][\s\S]*$/i, '').trim())}
+                        </div>
+                      )}
                     </div>
                   )}
                 </section>
