@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { fetchBISTData } from './utils/bist-data';
+import { fetchIsYatirimQuote } from './utils/isyatirim';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check';
 import { yahooFinance as yf, yahooFinance } from './utils/yahoo';
@@ -67,7 +68,10 @@ function requireApiKey(): Response | null {
   return null;
 }
 
-async function searchTavily(query: string): Promise<string> {
+async function searchTavily(
+  query: string,
+  opts?: { topic?: 'news' | 'general'; days?: number }
+): Promise<string> {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey || apiKey.startsWith('your-')) {
     return 'Haber bulunamadı (Tavily API anahtarı eksik veya geçersiz).';
@@ -83,7 +87,10 @@ async function searchTavily(query: string): Promise<string> {
         api_key: apiKey,
         query: query,
         search_depth: 'basic',
-        max_results: 5
+        max_results: 5,
+        // Güncellik filtresi: topic='news' + days=N son N günün haberlerini getirir
+        ...(opts?.topic ? { topic: opts.topic } : {}),
+        ...(opts?.days ? { days: opts.days } : {})
       })
     });
 
@@ -671,20 +678,41 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         
         const quotes = await Promise.all(
           bist30Symbols.map(async (sym) => {
+            const bare = sym.replace('.IS','');
+            // 1) Yahoo dene (hızlı, isim + anlık değişim verir)
             try {
               const q = await yahooFinance.quote(sym);
-              return {
-                ticker: sym.replace('.IS',''),
-                companyName: q.shortName || sym,
-                change: q.regularMarketChangePercent || 0,
-                price: q.regularMarketPrice || 0,
-                marketCap: q.marketCap || 0
-              };
-            } catch { return null; }
+              if (q && q.regularMarketPrice) {
+                return {
+                  ticker: bare,
+                  companyName: q.shortName || bare,
+                  change: q.regularMarketChangePercent ?? 0,
+                  price: q.regularMarketPrice ?? 0,
+                  marketCap: q.marketCap ?? 0
+                };
+              }
+            } catch { /* Yahoo 429 → İş Yatırım fallback */ }
+
+            // 2) İş Yatırım fallback (rate-limit'siz, Türk borsası)
+            try {
+              const iy = await fetchIsYatirimQuote(bare);
+              if (iy && iy.price) {
+                return {
+                  ticker: bare,
+                  companyName: bare,
+                  change: iy.change ?? 0,
+                  price: iy.price,
+                  marketCap: iy.marketCap ?? 0
+                };
+              }
+            } catch { /* her iki kaynak da başarısız */ }
+
+            return null;
           })
         );
         const results = quotes.filter(q => q !== null);
-        cacheSet('heatmap', results, 5 * 60 * 1000);
+        // Boş sonucu cache'leme — geçici hata 5 dk boyunca heatmap'i boş bırakmasın
+        if (results.length > 0) cacheSet('heatmap', results, 5 * 60 * 1000);
         return new Response(JSON.stringify(results), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       } catch (err) {
         return new Response(JSON.stringify({error:(err as Error).message}), {status:500, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
@@ -1072,13 +1100,21 @@ Kullanıcı metni: "${body.query}"`;
             const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
             const query = `Borsa İstanbul güncel KAP (Kamuyu Aydınlatma Platformu) bildirimleri ve şirket haberleri ${today}`;
             log('info', 'tavily_search', { query });
-            const searchResults = await searchTavily(query);
-            
+            // topic=news + days=3 → sadece son günlerin haberleri (eski tarihli sonuçları ele)
+            const searchResults = await searchTavily(query, { topic: 'news', days: 3 });
+
             const prompt = `
+Bugünün tarihi: ${today}.
+
 Aşağıda internetten derlenen Borsa İstanbul güncel KAP bildirimleri ve önemli şirket haberleri yer almaktadır:
 ${searchResults}
 
-Sen uzman bir finansal analistsin. Bu haberleri inceleyerek Borsa İstanbul yatırımcıları için "Günün Önemli KAP Bildirimleri" adında kısa ve çok net bir özet rapor hazırla. Sadece piyasayı etkileyebilecek (temettü, bedelsiz, yeni ihale, birleşme, kâr açıklaması vb.) olaylara odaklan. Uzun ve gereksiz metinleri at.
+Sen uzman bir finansal analistsin. Bu haberleri inceleyerek Borsa İstanbul yatırımcıları için kısa ve çok net bir özet rapor hazırla. Sadece piyasayı etkileyebilecek (temettü, bedelsiz, yeni ihale, birleşme, kâr açıklaması vb.) olaylara odaklan. Uzun ve gereksiz metinleri at.
+
+ÖNEMLİ KURALLAR:
+- Raporun başlığı "${today} — Önemli KAP Bildirimleri" olsun. Başlıkta MUTLAKA bugünün tarihini (${today}) kullan; haber metinlerindeki eski tarihleri başlık olarak ASLA kullanma.
+- Her bildirimin kendi yayın tarihi biliniyorsa, ilgili maddenin yanında parantez içinde belirt.
+- Yalnızca son birkaç günün gelişmelerini dahil et; çok eski haberleri atla.
 Markdown formatında hazırla.
 `;
             
