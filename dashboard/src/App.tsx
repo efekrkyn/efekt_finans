@@ -1901,12 +1901,21 @@ export default function App() {
               <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, marginBottom: '24px' }}>Bilanço Ajandası</h2>
               <div style={{ backgroundColor: 'var(--bg-card)', padding: isMobile ? 16 : 32, borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {[
-                    { date: 'Yarın, 18:00', event: 'TUPRS - 2026/03 Çeyreklik Bilanço Açıklaması' },
-                    { date: '12 Mayıs 2026', event: 'THYAO - Yatırımcı Sunumu' },
-                    { date: '15 Mayıs 2026', event: 'KCHOL - Temettü Dağıtımı (Hisse Başına 4.5 ₺)' },
-                    { date: '20 Mayıs 2026', event: 'ASELS - 2026/03 Çeyreklik Bilanço Açıklaması' }
-                  ].map((item, i) => (
+                  {(() => {
+                    const addDays = (d: number) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() + d);
+                      return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+                    };
+                    const y = new Date().getFullYear();
+                    const m = (new Date().getMonth() + 1).toString().padStart(2, '0');
+                    return [
+                      { date: 'Yarın, 18:00', event: `TUPRS - ${y}/${m} Çeyreklik Bilanço Açıklaması` },
+                      { date: addDays(3), event: 'THYAO - Yatırımcı Sunumu' },
+                      { date: addDays(6), event: 'KCHOL - Temettü Dağıtımı (Hisse Başına 4.5 ₺)' },
+                      { date: addDays(11), event: `ASELS - ${y}/${m} Çeyreklik Bilanço Açıklaması` }
+                    ];
+                  })().map((item, i) => (
                     <div key={i} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 4 : 24, paddingBottom: '16px', borderBottom: i === 3 ? 'none' : '1px solid var(--glass-border)' }}>
                       <div style={{ fontWeight: 700, color: 'var(--accent-primary)', width: isMobile ? 'auto' : 150, fontSize: isMobile ? '0.85rem' : 'inherit' }}>{item.date}</div>
                       <div style={{ color: 'var(--text-main)' }}>{item.event}</div>

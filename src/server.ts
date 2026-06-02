@@ -5,6 +5,7 @@ import { getReportBundle } from './utils/report-data';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check';
 import { fmpClient } from './utils/fmp.js';
+import yahooFinance from 'yahoo-finance2';
 
 checkEnv();
 process.on('unhandledRejection', r => console.error('unhandledRejection', String(r)));
@@ -154,8 +155,8 @@ export async function fetchHandler(req: Request): Promise<Response> {
         const days = range === '1m' ? 30 : range === '3m' ? 90 : range === '6m' ? 180 : range === '1y' ? 365 : 1825;
         start.setDate(end.getDate() - days);
         
-        const histResult = await fmpClient.historical(symbol, start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
-        const history = { quotes: histResult?.historical?.map(h => ({ date: new Date(h.date), close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume }))?.reverse() || [] };
+        const yfResult = await (yahooFinance as any).historical(symbol, { period1: start, period2: end, interval: '1d' });
+        const history = { quotes: yfResult.map((h: any) => ({ date: h.date, close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume })) || [] };
         const points = (history.quotes || [])
           .filter((q: any) => typeof q.close === 'number' && typeof q.open === 'number')
           .map((q: any) => ({
@@ -189,11 +190,11 @@ export async function fetchHandler(req: Request): Promise<Response> {
         const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
         const end = new Date();
         const start = new Date(); start.setDate(end.getDate() - 200);
-        const histResult = await fmpClient.historical(symbol, start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
-        const history = { quotes: histResult?.historical?.map(h => ({ date: new Date(h.date), close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume }))?.reverse() || [] };
-        const closes = history.quotes.map(q => q.close).filter((v): v is number => typeof v === 'number');
+        const yfResult = await (yahooFinance as any).historical(symbol, { period1: start, period2: end, interval: '1d' });
+        const history = { quotes: yfResult.map((h: any) => ({ date: h.date, close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume })) || [] };
+        const closes = history.quotes.map((q: any) => q.close).filter((v: any): v is number => typeof v === 'number');
         const { computeTechnicalIndicators } = await import('./utils/technical-indicators');
-        const bars = closes.map((c, i) => ({ date: `day${i}`, close: c }));
+        const bars = closes.map((c: any, i: any) => ({ date: `day${i}`, close: c }));
         const indicators = computeTechnicalIndicators(bars);
         
         const result = {
@@ -294,8 +295,8 @@ export async function fetchHandler(req: Request): Promise<Response> {
       if (!symbol) return new Response(JSON.stringify({error:'symbol zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       try {
         
-        const quoteRes = await fmpClient.quote(symbol);
-        const quote: any = quoteRes && quoteRes.length > 0 ? quoteRes[0] : null;
+        const quote = await (yahooFinance as any).quote(symbol).catch(() => null);
+        if (!quote) throw new Error('Varlık bulunamadı');
         return new Response(JSON.stringify({
           ticker: symbol,
           companyName: quote.longName || quote.shortName || symbol,
@@ -1005,12 +1006,8 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         
         const period1 = new Date();
         const start = new Date(); start.setDate(start.getDate() - (years * 365));
-        const histResult = await fmpClient.historical(
-          ticker + '.IS',
-          start.toISOString().split('T')[0],
-          new Date().toISOString().split('T')[0]
-        );
-        const history = histResult?.historical || [];
+        const yfResult = await (yahooFinance as any).historical(ticker + '.IS', { period1: start, period2: new Date(), interval: '1d' }).catch(() => []);
+        const history = yfResult;
 
         if (!history || history.length === 0) throw new Error('Veri bulunamadı.');
 
