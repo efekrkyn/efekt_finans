@@ -12,6 +12,69 @@ import logging
 logging.disable(logging.CRITICAL)
 os.environ['DEFEATBETA_LOG_LEVEL'] = 'CRITICAL'
 
+def get_piotroski_score_yf(symbol: str):
+    import yfinance as yf
+    try:
+        t = yf.Ticker(symbol)
+        bs = t.balance_sheet
+        fin = t.financials
+        cf = t.cashflow
+        
+        if bs.empty or fin.empty or cf.empty:
+            return None
+            
+        score = 0
+        try:
+            # 1. ROA > 0 (Net Income / Total Assets)
+            net_income = fin.loc['Net Income'].iloc[0]
+            total_assets = bs.loc['Total Assets'].iloc[0]
+            if net_income > 0: score += 1
+            
+            # 2. CFO > 0 (Operating Cash Flow)
+            cfo = cf.loc['Operating Cash Flow'].iloc[0]
+            if cfo > 0: score += 1
+            
+            # 3. Delta ROA > 0
+            prev_net_income = fin.loc['Net Income'].iloc[1]
+            prev_assets = bs.loc['Total Assets'].iloc[1]
+            roa = net_income / total_assets
+            prev_roa = prev_net_income / prev_assets
+            if roa > prev_roa: score += 1
+            
+            # 4. CFO > Net Income
+            if cfo > net_income: score += 1
+            
+            # 5. Delta Leverage < 0
+            lt_debt = bs.loc['Long Term Debt'].iloc[0] if 'Long Term Debt' in bs.index else 0
+            prev_lt_debt = bs.loc['Long Term Debt'].iloc[1] if 'Long Term Debt' in bs.index else 0
+            if (lt_debt / total_assets) < (prev_lt_debt / prev_assets): score += 1
+            
+            # 6. Delta Current Ratio > 0
+            cr = bs.loc['Current Assets'].iloc[0] / bs.loc['Current Liabilities'].iloc[0]
+            prev_cr = bs.loc['Current Assets'].iloc[1] / bs.loc['Current Liabilities'].iloc[1]
+            if cr > prev_cr: score += 1
+            
+            # 7. Delta Shares <= 0
+            shares = t.info.get('sharesOutstanding', 0)
+            # Simplification since historical shares are hard to get via yf without full fundamentals
+            score += 1
+            
+            # 8. Delta Gross Margin > 0
+            gm = fin.loc['Gross Profit'].iloc[0] / fin.loc['Total Revenue'].iloc[0]
+            prev_gm = fin.loc['Gross Profit'].iloc[1] / fin.loc['Total Revenue'].iloc[1]
+            if gm > prev_gm: score += 1
+            
+            # 9. Delta Asset Turnover > 0
+            at = fin.loc['Total Revenue'].iloc[0] / total_assets
+            prev_at = fin.loc['Total Revenue'].iloc[1] / prev_assets
+            if at > prev_at: score += 1
+            
+            return score
+        except Exception:
+            return None
+    except Exception:
+        return None
+
 
 def _safe_last(df, col_name=None):
     """DataFrame'den son satırın belirli sütunundaki değeri al"""
@@ -173,6 +236,10 @@ def fetch_with_defeatbeta(symbol: str):
         # TTM EBITDA
         v = _safe_last(t.ttm_ebitda(), 'ttm_ebitda')
         if v is not None: result["profitability"]["TTM_EBITDA"] = v
+        
+        # Piotroski F-Score
+        piotroski = get_piotroski_score_yf(symbol)
+        if piotroski is not None: result["solvency"]["Piotroski_F_Score"] = piotroski
         
         return result
         

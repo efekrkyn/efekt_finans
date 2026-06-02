@@ -18,7 +18,8 @@ export interface Message {
  * System prompt for generating message summaries
  */
 const MESSAGE_SUMMARY_SYSTEM_PROMPT = `You are a concise summarizer. Generate brief summaries of conversation answers.
-Keep summaries to 1-2 sentences that capture the key information.`;
+Keep summaries to 1-2 sentences that capture the key information.
+CRITICAL: If the conversation mentions a specific stock, ticker symbol, or company name, you MUST include it in your summary so the assistant remembers which stock was discussed.`;
 
 /**
  * Manages in-memory conversation history for multi-turn conversations.

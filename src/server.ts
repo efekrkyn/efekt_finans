@@ -618,7 +618,7 @@ ${t.adx !== undefined ? `- ADX(14): ${num(t.adx, 1)}` : '- ADX(14): Veri Yok'}`
 - FAVÖK Marjı: ${v.ebitdaMargin !== undefined ? pctDec(v.ebitdaMargin) : 'Veri Yok'}
 - EV/FCF: ${v.evToFcf !== undefined ? num(v.evToFcf, 1) : 'Veri Yok'}
 - Kalite Skoru: ${v.qualityScore}/${v.qualityMax} (${v.qualityLabel})
-- Piotroski F-Skoru: ${v.piotroskiScore !== undefined ? `${v.piotroskiScore}/9` : 'Hesaplanamadı'}`
+- Piotroski F-Skoru: ${(advancedRatios?.solvency?.Piotroski_F_Score !== undefined) ? `${advancedRatios.solvency.Piotroski_F_Score}/9` : (v.piotroskiScore !== undefined ? `${v.piotroskiScore}/9` : 'Hesaplanamadı')}`
               : '- Değerleme verisi hesaplanamadı';
 
             const chronosBlock = bundle.chronosForecast
@@ -791,7 +791,7 @@ Değerlerin toplamı 100 olmalı.`;
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         log('info', 'search', { query });
         
-        const searchResultsRes = await fmpClient.search(query, 'istanbul', 20);
+        const searchResultsRes = await fmpClient.search(query, '', 20);
         // Map to Yahoo Finance shape to avoid breaking LLM prompts
         const searchResults = {
           quotes: searchResultsRes.map(r => ({ symbol: r.symbol, shortname: r.name, longname: r.name, exchange: r.exchangeShortName }))
@@ -1536,6 +1536,7 @@ Sen uzman bir finansal analistsin. Bu haberleri inceleyerek Borsa İstanbul yat�
 ÖNEMLİ KURALLAR:
 - Raporun başlığı "${today} — Önemli KAP Bildirimleri" olsun. Başlıkta MUTLAKA bugünün tarihini (${today}) kullan; haber metinlerindeki eski tarihleri başlık olarak ASLA kullanma.
 - Her bildirimin kendi yayın tarihi biliniyorsa, ilgili maddenin yanında parantez içinde belirt.
+- **Duyarlılık Analizi (Sentiment):** Her haberin hisse fiyatına olası etkisini analiz et ve haber maddesinin en başına şu üç emojiden birini mutlaka ekle: 🟢 (Pozitif Etki), 🔴 (Negatif Etki), ⚪ (Nötr/Belirsiz Etki).
 - Yalnızca son birkaç günün gelişmelerini dahil et; çok eski haberleri atla.
 Markdown formatında hazırla.
 `;

@@ -727,7 +727,7 @@ export default function App() {
       .then(d => setMarketSummary(d))
       .catch(e => console.error(e));
 
-    loadStock('THYAO');
+    // loadStock('THYAO');
   }, []);
 
   useEffect(() => {
