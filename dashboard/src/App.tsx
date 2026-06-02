@@ -191,6 +191,10 @@ export default function App() {
   const [compareSuggestions, setCompareSuggestions] = useState<SearchHit[]>([]);
   const [compareStocks, setCompareStocks] = useState<AnalysisResult[]>([]);
 
+  // Bilanço Ajandası State
+  const [agendaEvents, setAgendaEvents] = useState<{date: string; isoDate: string; ticker: string; event: string; type: string; daysUntil?: number}[]>([]);
+  const [agendaLoading, setAgendaLoading] = useState(false);
+
   // AI Assistant State
   const [aiChatModel, setAiChatModel] = useState('deepseek-v4-pro');
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -217,6 +221,17 @@ export default function App() {
   const [assistantInput, setAssistantInput] = useState('');
   const [isAssistantTyping, setIsAssistantTyping] = useState(false);
   const [assistantStatus, setAssistantStatus] = useState('');
+
+  // Bilanço Ajandası — gerçek zamanlı veri çek
+  useEffect(() => {
+    if (activeTab !== 'agenda') return;
+    setAgendaLoading(true);
+    fetch(`${API_BASE}/api/agenda`)
+      .then(r => r.json())
+      .then(d => { if (d.events) setAgendaEvents(d.events); })
+      .catch(() => {})
+      .finally(() => setAgendaLoading(false));
+  }, [activeTab]);
 
   const [marketSummary, setMarketSummary] = useState<MarketSummary | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -1536,10 +1551,21 @@ export default function App() {
                   <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} color="var(--accent-primary)"/> Yaklaşan Ajanda <span style={{fontSize: '0.7rem', backgroundColor: 'var(--accent-negative)', padding: '2px 6px', borderRadius: '4px', marginLeft: 'auto'}}>Demo Veri</span></h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>TUPRS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Yarın</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>THYAO - Yatırımcı Sunumu</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>12 Mayıs</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>KCHOL - Temettü (4.5 ₺)</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>15 Mayıs</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>ASELS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>20 Mayıs</span></div>
+                      {(() => {
+                        const addDays = (d: number) => {
+                          const date = new Date();
+                          date.setDate(date.getDate() + d);
+                          return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+                        };
+                        return (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>TUPRS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Yarın</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>THYAO - Yatırımcı Sunumu</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{addDays(3)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>KCHOL - Temettü (4.5 ₺)</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{addDays(6)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}><span style={{ color: 'var(--text-muted)' }}>ASELS - Bilanço</span><span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{addDays(11)}</span></div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div style={{ backgroundColor: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
@@ -1900,28 +1926,67 @@ export default function App() {
             <div className="animated-fade-in" style={{ padding: isMobile ? 0 : 32 }}>
               <h2 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, marginBottom: '24px' }}>Bilanço Ajandası</h2>
               <div style={{ backgroundColor: 'var(--bg-card)', padding: isMobile ? 16 : 32, borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {(() => {
-                    const addDays = (d: number) => {
-                      const date = new Date();
-                      date.setDate(date.getDate() + d);
-                      return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-                    };
-                    const y = new Date().getFullYear();
-                    const m = (new Date().getMonth() + 1).toString().padStart(2, '0');
-                    return [
-                      { date: 'Yarın, 18:00', event: `TUPRS - ${y}/${m} Çeyreklik Bilanço Açıklaması` },
-                      { date: addDays(3), event: 'THYAO - Yatırımcı Sunumu' },
-                      { date: addDays(6), event: 'KCHOL - Temettü Dağıtımı (Hisse Başına 4.5 ₺)' },
-                      { date: addDays(11), event: `ASELS - ${y}/${m} Çeyreklik Bilanço Açıklaması` }
-                    ];
-                  })().map((item, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 4 : 24, paddingBottom: '16px', borderBottom: i === 3 ? 'none' : '1px solid var(--glass-border)' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--accent-primary)', width: isMobile ? 'auto' : 150, fontSize: isMobile ? '0.85rem' : 'inherit' }}>{item.date}</div>
-                      <div style={{ color: 'var(--text-main)' }}>{item.event}</div>
-                    </div>
-                  ))}
-                </div>
+                {agendaLoading ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                    <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                    Bilanço takvimi yükleniyor...
+                  </div>
+                ) : agendaEvents.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                    Yaklaşan etkinlik bulunamadı.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                    {agendaEvents.map((item, i) => {
+                      const typeColor = item.type === 'temettu' ? '#f59e0b' : item.type === 'sunum' ? '#60a5fa' : 'var(--accent-primary)';
+                      const typeLabel = item.type === 'temettu' ? '💰 Temettü' : item.type === 'sunum' ? '🎤 Sunum' : '📊 Bilanço';
+                      const isToday = item.date === 'Bugün';
+                      const isTomorrow = item.date === 'Yarın';
+                      return (
+                        <div key={i} style={{
+                          display: 'flex',
+                          flexDirection: isMobile ? 'column' : 'row',
+                          alignItems: isMobile ? 'flex-start' : 'center',
+                          gap: isMobile ? 6 : 16,
+                          padding: '14px 0',
+                          borderBottom: i === agendaEvents.length - 1 ? 'none' : '1px solid var(--glass-border)',
+                          backgroundColor: isToday ? 'rgba(16,185,129,0.06)' : 'transparent',
+                          borderRadius: isToday ? '8px' : '0',
+                          paddingLeft: isToday ? '12px' : '0',
+                        }}>
+                          <div style={{
+                            fontWeight: 700,
+                            color: isToday ? '#10b981' : isTomorrow ? '#f59e0b' : typeColor,
+                            width: isMobile ? 'auto' : 170,
+                            fontSize: isMobile ? '0.85rem' : '0.95rem',
+                            flexShrink: 0,
+                          }}>
+                            {item.date}
+                          </div>
+                          <div style={{
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: `${typeColor}20`,
+                            color: typeColor,
+                            flexShrink: 0,
+                            width: isMobile ? 'auto' : 100,
+                            textAlign: 'center',
+                          }}>
+                            {typeLabel}
+                          </div>
+                          <div style={{ color: 'var(--text-main)', fontSize: '0.95rem', flex: 1 }}>
+                            <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{item.ticker}</span>
+                            <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>—</span>
+                            <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>{item.event.replace(`${item.ticker} - `, '')}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}

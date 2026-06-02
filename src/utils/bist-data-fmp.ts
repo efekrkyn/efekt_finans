@@ -65,17 +65,21 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
 
   if (!usedFallback) {
     try {
-      const [incQ, bsQ, incA, bsA] = await Promise.all([
+      const [incQ, bsQ, cfQ, incA, bsA, cfA] = await Promise.all([
         fmpClient.incomeStatement(formattedTicker, 8, 'quarter').catch(() => []),
         fmpClient.balanceSheet(formattedTicker, 8, 'quarter').catch(() => []),
+        fmpClient.cashFlowStatement(formattedTicker, 8, 'quarter').catch(() => []),
         fmpClient.incomeStatement(formattedTicker, 5, 'annual').catch(() => []),
-        fmpClient.balanceSheet(formattedTicker, 5, 'annual').catch(() => [])
+        fmpClient.balanceSheet(formattedTicker, 5, 'annual').catch(() => []),
+        fmpClient.cashFlowStatement(formattedTicker, 5, 'annual').catch(() => [])
       ]);
 
-      const mapFmpData = (inc: any[], bs: any[], isAnnual: boolean): BISTPeriodData[] => {
+      const mapFmpData = (inc: any[], bs: any[], cf: any[], isAnnual: boolean): BISTPeriodData[] => {
         const bsMap = new Map(bs.map(b => [b.date.substring(0, 7), b]));
+        const cfMap = new Map(cf.map(c => [c.date.substring(0, 7), c]));
         return inc.map(i => {
           const b = bsMap.get(i.date.substring(0, 7)) || {};
+          const c = cfMap.get(i.date.substring(0, 7)) || {};
           const d = new Date(i.date);
           return {
             date: i.date,
@@ -91,14 +95,17 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
             currentLiabilities: b.totalCurrentLiabilities,
             nonCurrentLiabilities: b.totalNonCurrentLiabilities,
             netDebt: b.netDebt,
+            longTermDebt: b.longTermDebt,
             stockholdersEquity: b.totalStockholdersEquity,
-            freeCashFlow: undefined // FMP provides this in cash-flow-statement, skip for now to save API calls
+            freeCashFlow: c.freeCashFlow,
+            operatingCashFlow: c.operatingCashFlow,
+            sharesOutstanding: i.weightedAverageShsOut
           };
         }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       };
 
-      quarterly = mapFmpData(incQ, bsQ, false);
-      annual = mapFmpData(incA, bsA, true);
+      quarterly = mapFmpData(incQ, bsQ, cfQ, false);
+      annual = mapFmpData(incA, bsA, cfA, true);
     } catch (err) {
       console.error('FMP Financials fetch failed:', (err as Error).message);
     }
@@ -148,7 +155,7 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
       );
 
       historicalPrices = (histResult?.historical || [])
-        .map(h => ({ date: h.date, close: h.close }))
+        .map(h => ({ date: h.date, close: h.close, high: h.high, low: h.low }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       if (historicalPrices.length > 0) {

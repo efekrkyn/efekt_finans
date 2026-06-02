@@ -5,6 +5,8 @@ const generateBaselineBars = (length: number): PriceBar[] => {
   return Array.from({ length }, (_, i) => ({
     date: '2024-01-01',
     close: 100 + i * 2 + Math.sin(i) * 5,
+    high: 102 + i * 2 + Math.sin(i) * 5,
+    low: 98 + i * 2 + Math.sin(i) * 5,
   }));
 };
 
@@ -67,19 +69,29 @@ test('computeTechnicalIndicators > returns correct shape and baseline values', (
     expect(percentB).toBeGreaterThan(-5);
     expect(percentB).toBeLessThan(5);
   }
+
+  // ATR and ADX
+  expect(result.atr).toBeDefined();
+  expect(result.atr).toBeGreaterThanOrEqual(0);
+  
+  expect(result.adx).toBeDefined();
+  expect(result.adx).toBeGreaterThanOrEqual(0);
+  expect(result.adx).toBeLessThanOrEqual(100);
 });
 
 test('computeTechnicalIndicators > insufficient data', () => {
   const bars = generateBaselineBars(10);
   const result = computeTechnicalIndicators(bars);
 
-  // With 10 bars, RSI, MACD, SMA50/SMA20, Bollinger, and StochRSI are undefined
+  // With 10 bars, RSI, MACD, SMA50/SMA20, Bollinger, StochRSI, ATR, ADX are undefined
   expect(result.rsi).toBeUndefined();
   expect(result.stochasticRsi).toBeUndefined();
   expect(result.macd).toBeUndefined();
   expect(result.sma50).toBeUndefined();
   expect(result.sma20).toBeUndefined();
   expect(result.bollinger).toBeUndefined();
+  expect(result.atr).toBeUndefined();
+  expect(result.adx).toBeUndefined();
 
   // But function still returns valid signal shape
   expect(result.signal).toBeDefined();

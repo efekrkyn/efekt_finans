@@ -6,6 +6,10 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check';
 import { fmpClient } from './utils/fmp.js';
 import { yahooFinance } from './utils/yahoo.js';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 checkEnv();
 process.on('unhandledRejection', r => console.error('unhandledRejection', String(r)));
@@ -289,26 +293,40 @@ export async function fetchHandler(req: Request): Promise<Response> {
       }
     }
 
+    // 1.1b. API: Bilanço Ajandası (KAP + fallback takvim)
+    if (path === '/api/agenda') {
+      try {
+        const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+        const { stdout } = await execFileAsync(pyEnv, ['src/python/kap_agenda.py'], { timeout: 15000 });
+        const agenda = JSON.parse(stdout);
+        return new Response(JSON.stringify(agenda), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (err) {
+        return new Response(JSON.stringify({ events: [], error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
     // 1.2. API: Yabancı varlık (ABD hisse, döviz, kripto)
     if (path === '/api/asset') {
       const symbol = url.searchParams.get('symbol');
       if (!symbol) return new Response(JSON.stringify({error:'symbol zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       try {
-        
-        const quote = await (yahooFinance as any).quote(symbol).catch(() => null);
-        if (!quote) throw new Error('Varlık bulunamadı');
+        const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+        const { stdout } = await execFileAsync(pyEnv, ['src/python/asset_fetcher.py', symbol]);
+        const quote = JSON.parse(stdout);
+        if (quote.error || !quote.companyName) throw new Error(quote.error || 'Varlık bulunamadı');
+
         return new Response(JSON.stringify({
           ticker: symbol,
-          companyName: quote.longName || quote.shortName || symbol,
-          currentPrice: quote.regularMarketPrice,
+          companyName: quote.companyName,
+          currentPrice: quote.currentPrice,
           marketCap: quote.marketCap || null,
           currency: quote.currency || 'USD',
-          change: quote.regularMarketChangePercent || 0,
-          dayHigh: quote.regularMarketDayHigh,
-          dayLow: quote.regularMarketDayLow,
+          change: quote.change || 0,
+          dayHigh: quote.dayHigh,
+          dayLow: quote.dayLow,
           fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
           fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
-          volume: quote.regularMarketVolume,
+          volume: quote.volume,
           assetType: symbol.includes('=X') ? 'FX' : symbol.includes('-USD') ? 'CRYPTO' : 'EQUITY'
         }), {headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
       } catch (err) {
@@ -531,7 +549,9 @@ ${t.stochasticRsi !== undefined ? `- StochRSI(14): ${num(t.stochasticRsi, 1)}` :
 - MACD histogram: ${t.macd ? num(t.macd.histogram, 3) : 'Veri Yok'}
 - SMA20: ${num(t.sma20)} | SMA50: ${num(t.sma50)}
 ${t.bollinger ? `- Bollinger(20,2): Üst ${num(t.bollinger.upper)} / Orta ${num(t.bollinger.middle)} / Alt ${num(t.bollinger.lower)}; %B ${num(t.bollinger.percentB, 2)}` : '- Bollinger(20,2): Veri Yok'}
-- Birleşik sinyal: ${t.signal}`
+- Birleşik sinyal: ${t.signal}
+${t.atr !== undefined ? `- ATR(14): ${num(t.atr, 2)}` : '- ATR(14): Veri Yok'}
+${t.adx !== undefined ? `- ADX(14): ${num(t.adx, 1)}` : '- ADX(14): Veri Yok'}`
               : '- Teknik gösterge verisi yok';
 
             const targetBlock = tr
@@ -543,8 +563,13 @@ ${t.bollinger ? `- Bollinger(20,2): Üst ${num(t.bollinger.upper)} / Orta ${num(
 - Net Borç/FAVÖK: ${v.netDebtToEbitda !== undefined ? num(v.netDebtToEbitda, 2) : 'Veri Yok'}
 - FAVÖK Marjı: ${v.ebitdaMargin !== undefined ? pctDec(v.ebitdaMargin) : 'Veri Yok'}
 - EV/FCF: ${v.evToFcf !== undefined ? num(v.evToFcf, 1) : 'Veri Yok'}
-- Kalite Skoru: ${v.qualityScore}/${v.qualityMax} (${v.qualityLabel})`
+- Kalite Skoru: ${v.qualityScore}/${v.qualityMax} (${v.qualityLabel})
+- Piotroski F-Skoru: ${v.piotroskiScore !== undefined ? `${v.piotroskiScore}/9` : 'Hesaplanamadı'}`
               : '- Değerleme verisi hesaplanamadı';
+
+            const chronosBlock = bundle.chronosForecast
+              ? `- 30 Günlük Tahmin: Kötümser ${num(bundle.chronosForecast.day_30_low)} | Medyan ${num(bundle.chronosForecast.day_30_median)} | İyimser ${num(bundle.chronosForecast.day_30_high)}`
+              : '- ML Tahmini yok.';
 
             const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
             const prompt = `Bugünün tarihi: ${today}.
@@ -584,6 +609,9 @@ ${targetBlock}
 
 ### TEKNİK GÖRÜNÜM (kodda)
 ${techBlock}
+
+### YAPAY ZEKA TAHMİNİ (Chronos ML)
+${chronosBlock}
 
 ### DURUŞ (kodda): ${bundle.stance.label} — ${bundle.stance.rationale}
 
@@ -1023,9 +1051,9 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
         let smas: any[] = [];
         if (strategy === 'sma') {
            for (let i = 0; i < history.length; i++) {
+             const sma20 = history.slice(Math.max(0, i-20), i+1).reduce((s: number, d: any) => s + d.close, 0) / Math.min(20, i+1);
              const sma50 = history.slice(Math.max(0, i-50), i+1).reduce((s: number, d: any) => s + d.close, 0) / Math.min(50, i+1);
-             const sma200 = history.slice(Math.max(0, i-200), i+1).reduce((s: number, d: any) => s + d.close, 0) / Math.min(200, i+1);
-             smas.push({ sma200, sma50 });
+             smas.push({ sma20, sma50 });
            }
         }
 

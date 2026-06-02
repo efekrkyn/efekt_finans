@@ -29,36 +29,42 @@ export function parseChronosStdout(stdout: string): { success: boolean, data?: a
   return { success: false, error: 'Çıktı çözümlenemedi' };
 }
 
+export async function executeChronosForecast(tickerSymbol: string, daysToForecast: number = 30): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const ticker = tickerSymbol.trim().toUpperCase();
+    const days = Math.min(365, Math.max(1, Math.floor(daysToForecast)));
+    
+    const venvPython = join(process.cwd(), '.venv', 'bin', 'python');
+    const scriptPath = join(process.cwd(), 'src', 'python', 'chronos_forecast.py');
+
+    const { stdout, stderr } = await execFileAsync(venvPython, [scriptPath, ticker, days.toString()], {
+      timeout: 120_000,
+      killSignal: 'SIGKILL',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    
+    const parsed = parseChronosStdout(stdout);
+    if (parsed.success) return parsed;
+    return { success: false, error: `ML Model hatası: ${parsed.error}. Stderr: ${stderr}` };
+  } catch (error: any) {
+    if (error.killed || error.signal === 'SIGKILL') return { success: false, error: 'ML Model zaman aşımına uğradı.' };
+    if (error.stdout) {
+      const parsed = parseChronosStdout(error.stdout);
+      if (!parsed.success && parsed.error !== 'Çıktı çözümlenemedi') {
+        return { success: false, error: `ML Model hatası: ${parsed.error}` };
+      }
+    }
+    return { success: false, error: `ML Model çalıştırılamadı: ${error.message}` };
+  }
+}
+
 export const getChronosForecast = new DynamicStructuredTool({
   name: 'get_chronos_forecast',
   description: 'Uses an ML foundation model (Chronos) to predict the future price trajectory of a stock.',
   schema: ChronosInputSchema,
   func: async (input) => {
-    try {
-      const ticker = input.ticker.trim().toUpperCase();
-      const days = Math.min(365, Math.max(1, Math.floor(input.days || 30)));
-      
-      const venvPython = join(process.cwd(), '.venv', 'bin', 'python');
-      const scriptPath = join(process.cwd(), 'src', 'python', 'chronos_forecast.py');
-
-      const { stdout, stderr } = await execFileAsync(venvPython, [scriptPath, ticker, days.toString()], {
-        timeout: 120_000,
-        killSignal: 'SIGKILL',
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      
-      const parsed = parseChronosStdout(stdout);
-      if (parsed.success) return JSON.stringify(parsed.data, null, 2);
-      return `ML Model hatası: ${parsed.error}. Stderr: ${stderr}`;
-    } catch (error: any) {
-      if (error.killed || error.signal === 'SIGKILL') return 'ML Model zaman aşımına uğradı.';
-      if (error.stdout) {
-        const parsed = parseChronosStdout(error.stdout);
-        if (!parsed.success && parsed.error !== 'Çıktı çözümlenemedi') {
-          return `ML Model hatası: ${parsed.error}`;
-        }
-      }
-      return `ML Model çalıştırılamadı: ${error.message}`;
-    }
+    const result = await executeChronosForecast(input.ticker, input.days);
+    if (result.success) return JSON.stringify(result.data, null, 2);
+    return result.error || 'Bilinmeyen hata';
   },
 });

@@ -1,6 +1,8 @@
 export interface PriceBar {
   date: string;
   close: number;
+  high?: number;
+  low?: number;
 }
 
 export interface TechnicalIndicators {
@@ -19,11 +21,13 @@ export interface TechnicalIndicators {
     percentB: number;
   };
   stochasticRsi?: number;
+  atr?: number;
+  adx?: number;
   signal: 'AL' | 'SAT' | 'NÖTR';
   rsiSignal: 'AŞIRI ALIM' | 'AŞIRI SATIM' | 'NÖTR';
 }
 
-import { SMA, RSI, MACD, EMA, BollingerBands, StochasticRSI, NotEnoughDataError } from 'trading-signals';
+import { SMA, RSI, MACD, EMA, BollingerBands, StochasticRSI, ATR, ADX } from 'trading-signals';
 
 // Main technical indicators entrypoint
 export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicators {
@@ -36,14 +40,21 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
   const stochRsiIndicator = new StochasticRSI(14);
   const macdIndicator = new MACD(new EMA(12), new EMA(26), new EMA(9));
   const bollingerIndicator = new BollingerBands(20, 2);
+  const atrIndicator = new ATR(14);
+  const adxIndicator = new ADX(14);
 
-  for (const price of closePrices) {
-    sma20Indicator.update(price, false);
-    sma50Indicator.update(price, false);
-    rsiIndicator.update(price, false);
-    stochRsiIndicator.update(price, false);
-    macdIndicator.update(price, false);
-    bollingerIndicator.update(price, false);
+  for (const bar of bars) {
+    sma20Indicator.update(bar.close, false);
+    sma50Indicator.update(bar.close, false);
+    rsiIndicator.update(bar.close, false);
+    stochRsiIndicator.update(bar.close, false);
+    macdIndicator.update(bar.close, false);
+    bollingerIndicator.update(bar.close, false);
+    if (bar.high !== undefined && bar.low !== undefined) {
+      const hlc = { high: bar.high, low: bar.low, close: bar.close };
+      try { atrIndicator.update(hlc, false); } catch {}
+      try { adxIndicator.update(hlc, false); } catch {}
+    }
   }
 
   let sma20: number | undefined;
@@ -94,6 +105,18 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
     }
   } catch {}
 
+  let atr: number | undefined;
+  try {
+    const r = atrIndicator.getResult();
+    if (r !== null && r !== undefined) atr = Number(r.valueOf());
+  } catch {}
+
+  let adx: number | undefined;
+  try {
+    const r = adxIndicator.getResult();
+    if (r !== null && r !== undefined) adx = Number(r.valueOf());
+  } catch {}
+
   // 4. Generate Trading Signals
   let buySignals = 0;
   let sellSignals = 0;
@@ -139,6 +162,8 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
     sma50,
     bollinger: bollingerResult,
     stochasticRsi,
+    atr,
+    adx,
     signal,
     rsiSignal
   };

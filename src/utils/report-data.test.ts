@@ -6,10 +6,15 @@ describe('mapTier', () => {
   test('fmp → tam', () => {
     expect(mapTier('fmp')).toBe('tam');
   });
-  test('isyatirim-fallback → kısıtlı', () => {
+  test('mapTier > isyatirim-fallback → kısıtlı', () => {
     expect(mapTier('isyatirim-fallback')).toBe('kısıtlı');
   });
-  test('undefined → tam (varsayılan)', () => {
+
+  test('mapTier > borsajs → kısıtlı', () => {
+    expect(mapTier('borsajs')).toBe('kısıtlı');
+  });
+
+  test('mapTier > undefined → tam (varsayılan)', () => {
     expect(mapTier(undefined)).toBe('tam');
   });
 });

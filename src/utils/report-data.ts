@@ -12,7 +12,8 @@
 import { fetchBISTData, type BISTAnalysisResult } from './bist-data';
 import { computeDcf, type DcfResult } from './dcf';
 import type { TechnicalIndicators } from './technical-indicators';
-import { computeValuationMetrics, type ValuationMetrics } from './valuation-metrics';
+import { computeValuationMetrics, type ValuationMetrics } from './valuation-metrics.js';
+import { executeChronosForecast } from '../tools/finance/chronos-forecast.js';
 
 export type DataTier = 'tam' | 'kısıtlı';
 export type StanceLabel = 'Pozitif' | 'Nötr' | 'Negatif';
@@ -28,7 +29,7 @@ export interface ReportBundle {
   currentPrice: number;
   marketCap: number;
   currency: string;
-  dataSource: 'yahoo' | 'isyatirim-fallback' | 'fmp';
+  dataSource: 'yahoo' | 'isyatirim-fallback' | 'fmp' | 'borsajs';
   tier: DataTier;
   multiples: { trailingPE?: number; priceToBook?: number; evToEbitda?: number };
   scorecard: BISTAnalysisResult['scorecard'];
@@ -48,11 +49,16 @@ export interface ReportBundle {
   targetRange: { low: number; high: number; basis: 'dcf' | 'teknik' } | null;
   stance: { label: StanceLabel; rationale: string };
   valuation?: ValuationMetrics;
+  chronosForecast?: {
+    day_30_low: number;
+    day_30_median: number;
+    day_30_high: number;
+  };
 }
 
-/** dataSource → veri katmanı. İş Yatırım fallback'i finansal periyot içermez. */
-export function mapTier(dataSource?: 'yahoo' | 'isyatirim-fallback' | 'fmp'): DataTier {
-  return dataSource === 'isyatirim-fallback' ? 'kısıtlı' : 'tam';
+/** dataSource → veri katmanı. İş Yatırım ve borsajs fallback'i finansal periyot içermez. */
+export function mapTier(dataSource?: 'yahoo' | 'isyatirim-fallback' | 'fmp' | 'borsajs'): DataTier {
+  return (dataSource === 'isyatirim-fallback' || dataSource === 'borsajs') ? 'kısıtlı' : 'tam';
 }
 
 /** 12 aylık hedef aralık: DCF mümkünse sensitivity grid min/max; değilse 52-hafta bandı. */
@@ -131,15 +137,23 @@ export async function getReportBundle(
 
   let news: string | null = null;
   let peerContext: string | null = null;
+  let chronosForecast: ReportBundle['chronosForecast'] = undefined;
+
+  const asyncTasks: Promise<any>[] = [];
+
   if (opts.search) {
     const search = opts.search;
-    const [n, p] = await Promise.all([
-      search(`${financials.companyName} (${ticker}) hisse son haberler gelişmeler`, { topic: 'news', days: 7 }).catch(() => null),
-      search(`Borsa İstanbul ${financials.companyName} (${ticker}) sektörü rakipleri kıyaslama pazar payı`, { topic: 'general' }).catch(() => null),
-    ]);
-    news = n;
-    peerContext = p;
+    asyncTasks.push(search(`${financials.companyName} (${ticker}) hisse son haberler gelişmeler`, { topic: 'news', days: 7 }).then(res => { news = res; }).catch(() => null));
+    asyncTasks.push(search(`Borsa İstanbul ${financials.companyName} (${ticker}) sektörü rakipleri kıyaslama pazar payı`, { topic: 'general' }).then(res => { peerContext = res; }).catch(() => null));
   }
+
+  asyncTasks.push(executeChronosForecast(ticker, 30).then(res => {
+    if (res.success && res.data?.forecast) {
+      chronosForecast = res.data.forecast;
+    }
+  }).catch(() => null));
+
+  await Promise.all(asyncTasks);
 
   const stance = deriveStance({
     dcfFeasible: dcf.feasible,
@@ -185,7 +199,25 @@ export async function getReportBundle(
       netDebt: base?.netDebt,
       netIncome: base?.netIncome,
       totalRevenue: base?.totalRevenue,
-      revenueGrowthYoY: financials.scorecard.revenueGrowthYoY
+      revenueGrowthYoY: financials.scorecard.revenueGrowthYoY,
+      operatingCashFlow: base?.operatingCashFlow,
+      totalAssets: base?.totalAssets,
+      currentAssets: base?.currentAssets,
+      currentLiabilities: base?.currentLiabilities,
+      longTermDebt: base?.longTermDebt,
+      grossProfit: base?.grossProfit,
+      sharesOutstanding: base?.sharesOutstanding,
+      prevPeriod: financials.annual.length >= 2 ? {
+        netIncome: financials.annual[financials.annual.length - 2].netIncome,
+        totalAssets: financials.annual[financials.annual.length - 2].totalAssets,
+        longTermDebt: financials.annual[financials.annual.length - 2].longTermDebt,
+        currentAssets: financials.annual[financials.annual.length - 2].currentAssets,
+        currentLiabilities: financials.annual[financials.annual.length - 2].currentLiabilities,
+        sharesOutstanding: financials.annual[financials.annual.length - 2].sharesOutstanding,
+        grossProfit: financials.annual[financials.annual.length - 2].grossProfit,
+        totalRevenue: financials.annual[financials.annual.length - 2].totalRevenue,
+      } : undefined
     }),
+    chronosForecast,
   };
 }

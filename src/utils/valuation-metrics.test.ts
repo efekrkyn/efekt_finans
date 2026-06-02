@@ -86,3 +86,41 @@ test('computeValuationMetrics > handles negative values for quality score proper
   expect(result.qualityScore).toBe(1);
   expect(result.qualityLabel).toBe('Zayıf');
 });
+
+test('computeValuationMetrics > calculates Piotroski F-Score correctly', () => {
+  const result = computeValuationMetrics({
+    marketCap: 1000,
+    netIncome: 100, // 1. Positive Net Income (+1)
+    operatingCashFlow: 150, // 2. Positive OCF (+1) & 4. CFO > Net Income (+1)
+    totalAssets: 2000,
+    longTermDebt: 500,
+    currentAssets: 500,
+    currentLiabilities: 250,
+    sharesOutstanding: 1000,
+    grossProfit: 400,
+    totalRevenue: 1000,
+    prevPeriod: {
+      netIncome: 80, // ROA = 100/2000 = 0.05, prevROA = 80/1800 = 0.044 -> 3. Higher ROA (+1)
+      totalAssets: 1800,
+      longTermDebt: 600, // Debt Ratio = 500/2000 = 0.25, prev = 600/1800 = 0.33 -> 5. Lower Debt Ratio (+1)
+      currentAssets: 400,
+      currentLiabilities: 250, // CR = 500/250 = 2, prev = 400/250 = 1.6 -> 6. Higher CR (+1)
+      sharesOutstanding: 1000, // Shares didn't increase -> 7. No New Shares (+1)
+      grossProfit: 300,
+      totalRevenue: 800, // Margin = 400/1000 = 0.4, prev = 300/800 = 0.375 -> 8. Higher Margin (+1)
+                         // Turnover = 1000/2000 = 0.5, prev = 800/1800 = 0.44 -> 9. Higher Turnover (+1)
+    }
+  });
+
+  expect(result.piotroskiScore).toBe(9);
+
+  // Test missing data
+  const resultMissing = computeValuationMetrics({
+    netIncome: 100,
+    totalAssets: 2000,
+    prevPeriod: {
+      totalAssets: 1800
+    }
+  });
+  expect(resultMissing.piotroskiScore).toBeUndefined();
+});

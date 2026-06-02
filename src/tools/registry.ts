@@ -15,6 +15,7 @@ import { GET_MARKET_DATA_DESCRIPTION } from './finance/get-market-data';
 import { READ_FILINGS_DESCRIPTION } from './finance/read-filings';
 import { SCREEN_STOCKS_DESCRIPTION } from './finance/screen-stocks';
 import { CHRONOS_FORECAST_DESCRIPTION } from './finance/chronos-forecast';
+import { kapAgentTool, KAP_AGENT_DESCRIPTION } from './finance/kap-agent';
 import { heartbeatTool, HEARTBEAT_TOOL_DESCRIPTION } from './heartbeat/heartbeat-tool';
 import { cronTool, CRON_TOOL_DESCRIPTION } from './cron/cron-tool';
 import { memoryGetTool, MEMORY_GET_DESCRIPTION, memorySearchTool, MEMORY_SEARCH_DESCRIPTION, memoryUpdateTool, MEMORY_UPDATE_DESCRIPTION } from './memory/index';
@@ -78,6 +79,13 @@ export function getToolRegistry(model: string): RegisteredTool[] {
       tool: getChronosForecast,
       description: CHRONOS_FORECAST_DESCRIPTION,
       compactDescription: 'Runs Amazon Chronos ML model to predict future 30-day stock price based on historical data.',
+      concurrencySafe: false,
+    },
+    {
+      name: 'kap_agent',
+      tool: kapAgentTool,
+      description: KAP_AGENT_DESCRIPTION,
+      compactDescription: 'Reads official KAP (Public Disclosure Platform) announcements and parses their PDF/HTML contents.',
       concurrencySafe: false,
     },
     {

@@ -16,8 +16,11 @@ export interface BISTPeriodData {
   currentLiabilities?: number;
   nonCurrentLiabilities?: number;
   netDebt?: number;
+  longTermDebt?: number;
   stockholdersEquity?: number;
   freeCashFlow?: number;
+  operatingCashFlow?: number;
+  sharesOutstanding?: number;
 }
 
 export interface BISTAnalysisResult {
@@ -41,17 +44,22 @@ export interface BISTAnalysisResult {
     priceToBook?: number;
     evToEbitda?: number;
   };
-  historicalPrices: { date: string; close: number }[];
+  historicalPrices: { date: string; close: number; high?: number; low?: number }[];
   technicalIndicators?: TechnicalIndicators;
-  dataSource: 'fmp' | 'isyatirim-fallback' | 'yahoo';
+  dataSource: 'fmp' | 'isyatirim-fallback' | 'yahoo' | 'borsajs';
 }
+
+import { fetchBISTData as fetchBISTDataBorsaJS } from './bist-data-borsajs.js';
 
 export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult> {
   // Eğer ortam değişkenlerinde BIST_DATA_SOURCE=yahoo tanımlıysa Yahoo'yu kullan
-  // (Lokalde .env dosyasında bunu set edeceğiz, Vercel/Render'da varsayılan olarak FMP çalışacak)
+  // Eğer borsajs tanımlıysa onu kullan
   if (process.env.BIST_DATA_SOURCE === 'yahoo') {
     return fetchBISTDataYahoo(ticker);
+  } else if (process.env.BIST_DATA_SOURCE === 'borsajs') {
+    return fetchBISTDataBorsaJS(ticker);
   } else {
+    // Varsayılan: FMP
     return fetchBISTDataFMP(ticker);
   }
 }

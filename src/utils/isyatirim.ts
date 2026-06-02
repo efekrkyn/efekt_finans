@@ -17,7 +17,7 @@ interface IsYatirimQuote {
   low?: number;
   volume?: number;
   /** Son ~600 günün kapanış serisi (teknik indikatör + chart için) */
-  history: { date: string; close: number }[];
+  history: { date: string; close: number; high?: number; low?: number }[];
 }
 
 function ddmmyyyy(d: Date): string {
@@ -63,12 +63,14 @@ export async function fetchIsYatirimQuote(ticker: string): Promise<IsYatirimQuot
     const history = rows
       .map((r: any) => {
         const c = Number(r.HGDG_KAPANIS ?? r.HG_KAPANIS ?? NaN);
+        const h = Number(r.HGDG_MAX ?? NaN);
+        const l = Number(r.HGDG_MIN ?? NaN);
         if (!isFinite(c)) return null;
         const dateStr = typeof r.HGDG_TARIH === 'string' ? parseTrDate(r.HGDG_TARIH) : null;
         if (!dateStr) return null;
-        return { date: dateStr, close: c };
+        return { date: dateStr, close: c, high: isFinite(h) ? h : undefined, low: isFinite(l) ? l : undefined };
       })
-      .filter((x): x is { date: string; close: number } => x !== null);
+      .filter((x): x is { date: string; close: number; high?: number; low?: number } => x !== null);
 
     return {
       ticker: sym,

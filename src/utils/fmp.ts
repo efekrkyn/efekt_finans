@@ -47,6 +47,10 @@ export const fmpClient = {
     return fetchFmp<any[]>(`/balance-sheet-statement/${ticker}`, { limit, period });
   },
 
+  async cashFlowStatement(ticker: string, limit: number = 4, period: 'quarter' | 'annual' = 'quarter'): Promise<any[]> {
+    return fetchFmp<any[]>(`/cash-flow-statement/${ticker}`, { limit, period });
+  },
+
   async historical(ticker: string, from?: string, to?: string): Promise<{ symbol: string, historical: any[] }> {
     const params: Record<string, string> = {};
     if (from) params.from = from;

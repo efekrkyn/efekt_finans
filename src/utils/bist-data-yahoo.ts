@@ -225,7 +225,9 @@ export async function fetchBISTData(ticker: string): Promise<BISTAnalysisResult>
         .filter(h => h.date && h.close !== undefined && h.close !== null)
         .map(h => ({
           date: new Date(h.date).toISOString().split('T')[0],
-          close: h.close
+          close: h.close,
+          high: h.high,
+          low: h.low
         }));
 
       if (historicalPrices.length > 0) {
