@@ -154,23 +154,14 @@ export async function fetchHandler(req: Request): Promise<Response> {
       if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json'}});
       try {
         const symbol = ticker.endsWith('.IS') ? ticker : `${ticker}.IS`;
-        const end = new Date();
-        const start = new Date();
         const days = range === '1m' ? 30 : range === '3m' ? 90 : range === '6m' ? 180 : range === '1y' ? 365 : 1825;
-        start.setDate(end.getDate() - days);
         
-        const yfResult = await (yahooFinance as any).historical(symbol, { period1: start, period2: end, interval: '1d' });
-        const history = { quotes: yfResult.map((h: any) => ({ date: h.date, close: h.close, open: h.open, high: h.high, low: h.low, volume: h.volume })) || [] };
-        const points = (history.quotes || [])
-          .filter((q: any) => typeof q.close === 'number' && typeof q.open === 'number')
-          .map((q: any) => ({
-            date: q.date,
-            open: q.open,
-            high: q.high,
-            low: q.low,
-            close: q.close,
-            volume: q.volume
-          }));
+        const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+        const { stdout } = await execFileAsync(pyEnv, ['src/python/price_history.py', symbol, days.toString()], { timeout: 15000 });
+        
+        const points = JSON.parse(stdout);
+        if ((points as any).error) throw new Error((points as any).error);
+
         return new Response(JSON.stringify({ ticker, range, points }), {
           headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}
         });

@@ -2802,7 +2802,7 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-                    {priceHistory && priceHistory.points.length > 0 ? (
+                    {priceHistory && Array.isArray(priceHistory.points) && priceHistory.points.length > 0 ? (
                       chartType === 'candle' ? (
                         <CandlestickChart data={priceHistory.points as any} />
                       ) : (
@@ -2821,7 +2821,9 @@ export default function App() {
                         </div>
                       )
                     ) : (
-                      <div style={{color:'var(--text-muted)', padding:60, textAlign:'center'}}>Fiyat verisi yükleniyor...</div>
+                      <div style={{color:'var(--text-muted)', padding:60, textAlign:'center'}}>
+                        {(priceHistory as any)?.error ? `Fiyat verisi alınamadı: ${(priceHistory as any).error}` : 'Fiyat verisi yükleniyor...'}
+                      </div>
                     )}
                   </section>
                 <section style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--glass-border)', padding: isMobile ? 16 : 32 }}>
