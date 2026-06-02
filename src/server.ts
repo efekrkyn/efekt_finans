@@ -791,13 +791,14 @@ Değerlerin toplamı 100 olmalı.`;
         if (cached) return new Response(JSON.stringify(cached), { headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
         log('info', 'search', { query });
         
-        const searchResultsRes = await fmpClient.search(query, '', 20);
-        // Map to Yahoo Finance shape to avoid breaking LLM prompts
-        const searchResults = {
-          quotes: searchResultsRes.map(r => ({ symbol: r.symbol, shortname: r.name, longname: r.name, exchange: r.exchangeShortName }))
-        };
-
-        const allResults = (searchResults.quotes || [])
+        // Yahoo Finance Autocomplete API
+        const yfUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=10&newsCount=0`;
+        const yfRes = await fetch(yfUrl);
+        if (!yfRes.ok) throw new Error(`Yahoo Finance Search API Hatası: ${yfRes.status}`);
+        
+        const yfData = await yfRes.json();
+        
+        const allResults = (yfData.quotes || [])
           .filter((q: any) => typeof q?.symbol === 'string')
           .map((q: any) => {
             const symbol: string = q.symbol;
