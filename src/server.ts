@@ -528,6 +528,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
               ? `- RSI(14): ${num(t.rsi, 1)} (${t.rsiSignal})
 - MACD histogram: ${t.macd ? num(t.macd.histogram, 3) : 'Veri Yok'}
 - SMA20: ${num(t.sma20)} | SMA50: ${num(t.sma50)}
+${t.bollinger ? `- Bollinger(20,2): Üst ${num(t.bollinger.upper)} / Orta ${num(t.bollinger.middle)} / Alt ${num(t.bollinger.lower)}; %B ${num(t.bollinger.percentB, 2)}` : '- Bollinger(20,2): Veri Yok'}
 - Birleşik sinyal: ${t.signal}`
               : '- Teknik gösterge verisi yok';
 

@@ -40,17 +40,38 @@ test('computeTechnicalIndicators > returns correct shape and baseline values', (
   // Signals
   expect(result.signal).toBe('AL');
   expect(result.rsiSignal).toBe('AŞIRI ALIM');
+
+  // Bollinger Bands
+  expect(result.bollinger).toBeDefined();
+  if (result.bollinger) {
+    const { upper, middle, lower, percentB } = result.bollinger;
+    expect(upper).toBeGreaterThan(middle);
+    expect(middle).toBeGreaterThan(lower);
+    
+    // middle should strictly match sma20
+    expect(middle).toBeCloseTo(result.sma20!, 6);
+
+    // percentB formula verification
+    const latestClose = bars[bars.length - 1].close;
+    const expectedPercentB = (latestClose - lower) / (upper - lower);
+    expect(percentB).toBeCloseTo(expectedPercentB, 6);
+    
+    // Check reasonable range (should be somewhat around the band, not absurdly huge/small)
+    expect(percentB).toBeGreaterThan(-5);
+    expect(percentB).toBeLessThan(5);
+  }
 });
 
 test('computeTechnicalIndicators > insufficient data', () => {
   const bars = generateBaselineBars(10);
   const result = computeTechnicalIndicators(bars);
 
-  // With 10 bars, RSI, MACD, and SMA50/SMA20 are undefined
+  // With 10 bars, RSI, MACD, SMA50/SMA20 and Bollinger are undefined
   expect(result.rsi).toBeUndefined();
   expect(result.macd).toBeUndefined();
   expect(result.sma50).toBeUndefined();
   expect(result.sma20).toBeUndefined();
+  expect(result.bollinger).toBeUndefined();
 
   // But function still returns valid signal shape
   expect(result.signal).toBeDefined();
