@@ -62,3 +62,7 @@ coverage.json
 
 # Scratchpad files
 scratchpads/*
+
+# Infra configs — public repoda tutulmaz, sadece sunucuda kalır
+jail.local
+nginx-default.conf
