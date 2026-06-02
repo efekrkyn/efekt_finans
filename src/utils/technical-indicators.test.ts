@@ -41,6 +41,13 @@ test('computeTechnicalIndicators > returns correct shape and baseline values', (
   expect(result.signal).toBe('AL');
   expect(result.rsiSignal).toBe('AŞIRI ALIM');
 
+  // Stochastic RSI
+  expect(result.stochasticRsi).toBeDefined();
+  if (result.stochasticRsi !== undefined) {
+    expect(result.stochasticRsi).toBeGreaterThanOrEqual(0);
+    expect(result.stochasticRsi).toBeLessThanOrEqual(100);
+  }
+
   // Bollinger Bands
   expect(result.bollinger).toBeDefined();
   if (result.bollinger) {
@@ -66,8 +73,9 @@ test('computeTechnicalIndicators > insufficient data', () => {
   const bars = generateBaselineBars(10);
   const result = computeTechnicalIndicators(bars);
 
-  // With 10 bars, RSI, MACD, SMA50/SMA20 and Bollinger are undefined
+  // With 10 bars, RSI, MACD, SMA50/SMA20, Bollinger, and StochRSI are undefined
   expect(result.rsi).toBeUndefined();
+  expect(result.stochasticRsi).toBeUndefined();
   expect(result.macd).toBeUndefined();
   expect(result.sma50).toBeUndefined();
   expect(result.sma20).toBeUndefined();

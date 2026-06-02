@@ -18,11 +18,12 @@ export interface TechnicalIndicators {
     lower: number;
     percentB: number;
   };
+  stochasticRsi?: number;
   signal: 'AL' | 'SAT' | 'NÖTR';
   rsiSignal: 'AŞIRI ALIM' | 'AŞIRI SATIM' | 'NÖTR';
 }
 
-import { SMA, RSI, MACD, EMA, BollingerBands, NotEnoughDataError } from 'trading-signals';
+import { SMA, RSI, MACD, EMA, BollingerBands, StochasticRSI, NotEnoughDataError } from 'trading-signals';
 
 // Main technical indicators entrypoint
 export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicators {
@@ -32,6 +33,7 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
   const sma20Indicator = new SMA(20);
   const sma50Indicator = new SMA(50);
   const rsiIndicator = new RSI(14);
+  const stochRsiIndicator = new StochasticRSI(14);
   const macdIndicator = new MACD(new EMA(12), new EMA(26), new EMA(9));
   const bollingerIndicator = new BollingerBands(20, 2);
 
@@ -39,6 +41,7 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
     sma20Indicator.update(price, false);
     sma50Indicator.update(price, false);
     rsiIndicator.update(price, false);
+    stochRsiIndicator.update(price, false);
     macdIndicator.update(price, false);
     bollingerIndicator.update(price, false);
   }
@@ -59,6 +62,12 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
   try { 
     const r = rsiIndicator.getResult();
     if (r !== null && r !== undefined) rsi = Number(r.valueOf()); 
+  } catch {}
+
+  let stochasticRsi: number | undefined;
+  try {
+    const sr = stochRsiIndicator.getResult();
+    if (sr !== null && sr !== undefined) stochasticRsi = Number(sr.valueOf()) * 100;
   } catch {}
 
   let macdResult: { macdLine: number; signalLine: number; histogram: number } | undefined;
@@ -129,6 +138,7 @@ export function computeTechnicalIndicators(bars: PriceBar[]): TechnicalIndicator
     sma20,
     sma50,
     bollinger: bollingerResult,
+    stochasticRsi,
     signal,
     rsiSignal
   };

@@ -527,6 +527,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
             const t = bundle.technicals;
             const techBlock = t
               ? `- RSI(14): ${num(t.rsi, 1)} (${t.rsiSignal})
+${t.stochasticRsi !== undefined ? `- StochRSI(14): ${num(t.stochasticRsi, 1)}` : '- StochRSI(14): Veri Yok'}
 - MACD histogram: ${t.macd ? num(t.macd.histogram, 3) : 'Veri Yok'}
 - SMA20: ${num(t.sma20)} | SMA50: ${num(t.sma50)}
 ${t.bollinger ? `- Bollinger(20,2): Üst ${num(t.bollinger.upper)} / Orta ${num(t.bollinger.middle)} / Alt ${num(t.bollinger.lower)}; %B ${num(t.bollinger.percentB, 2)}` : '- Bollinger(20,2): Veri Yok'}
