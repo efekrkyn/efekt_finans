@@ -50,6 +50,11 @@ export const readFileTool = new DynamicStructuredTool({
     });
     const absolutePath = resolveReadPath(sandboxPath, cwd);
 
+    const SECRET_RE = [/(^|\/)\.env(\.|$)/i, /(^|\/)\.git(\/|$)/i, /\.(pem|key|crt|p12)$/i, /(^|\/)id_(rsa|ed25519)/i];
+    if (SECRET_RE.some(re => re.test(input.path) || re.test(absolutePath))) {
+      throw new Error('Bu dosyaya erişim güvenlik nedeniyle engellendi.');
+    }
+
     await access(absolutePath, constants.R_OK);
 
     const textContent = (await readFile(absolutePath)).toString('utf-8');

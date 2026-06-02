@@ -1,5 +1,5 @@
 import { StructuredToolInterface } from '@langchain/core/tools';
-import { createGetFinancials, createGetMarketData, createReadFilings, createScreenStocks } from './finance/index';
+import { createGetFinancials, createGetMarketData, createReadFilings, createScreenStocks, getChronosForecast, getPortfolioTool, buyPortfolioTool, sellPortfolioTool, PORTFOLIO_GET_DESCRIPTION, PORTFOLIO_BUY_DESCRIPTION, PORTFOLIO_SELL_DESCRIPTION } from './finance/index';
 import { exaSearch, perplexitySearch, tavilySearch, langSearch, WEB_SEARCH_DESCRIPTION, xSearchTool, X_SEARCH_DESCRIPTION } from './search/index';
 import { createWebSearchTool, type WebSearchProvider } from './search/web-search';
 import { getSetting } from '../utils/config';
@@ -14,6 +14,7 @@ import { GET_FINANCIALS_DESCRIPTION } from './finance/get-financials';
 import { GET_MARKET_DATA_DESCRIPTION } from './finance/get-market-data';
 import { READ_FILINGS_DESCRIPTION } from './finance/read-filings';
 import { SCREEN_STOCKS_DESCRIPTION } from './finance/screen-stocks';
+import { CHRONOS_FORECAST_DESCRIPTION } from './finance/chronos-forecast';
 import { heartbeatTool, HEARTBEAT_TOOL_DESCRIPTION } from './heartbeat/heartbeat-tool';
 import { cronTool, CRON_TOOL_DESCRIPTION } from './cron/cron-tool';
 import { memoryGetTool, MEMORY_GET_DESCRIPTION, memorySearchTool, MEMORY_SEARCH_DESCRIPTION, memoryUpdateTool, MEMORY_UPDATE_DESCRIPTION } from './memory/index';
@@ -71,6 +72,34 @@ export function getToolRegistry(model: string): RegisteredTool[] {
       description: SCREEN_STOCKS_DESCRIPTION,
       compactDescription: 'Screen stocks by financial criteria (P/E, growth, margins, etc.).',
       concurrencySafe: true,
+    },
+    {
+      name: 'get_chronos_forecast',
+      tool: getChronosForecast,
+      description: CHRONOS_FORECAST_DESCRIPTION,
+      compactDescription: 'Runs Amazon Chronos ML model to predict future 30-day stock price based on historical data.',
+      concurrencySafe: false,
+    },
+    {
+      name: 'portfolio_get',
+      tool: getPortfolioTool,
+      description: PORTFOLIO_GET_DESCRIPTION,
+      compactDescription: 'View the virtual paper trading portfolio balance and held stock positions.',
+      concurrencySafe: true,
+    },
+    {
+      name: 'portfolio_buy',
+      tool: buyPortfolioTool,
+      description: PORTFOLIO_BUY_DESCRIPTION,
+      compactDescription: 'Buy shares of a US stock in the virtual paper trading portfolio.',
+      concurrencySafe: false,
+    },
+    {
+      name: 'portfolio_sell',
+      tool: sellPortfolioTool,
+      description: PORTFOLIO_SELL_DESCRIPTION,
+      compactDescription: 'Sell shares of a US stock in the virtual paper trading portfolio.',
+      concurrencySafe: false,
     },
     {
       name: 'web_fetch',

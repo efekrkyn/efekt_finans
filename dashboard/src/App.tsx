@@ -7,8 +7,8 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart as 
 import { CandlestickChart } from './CandlestickChart';
 import { InfoTooltip } from './InfoTooltip';
 
-// Backend Render'da, frontend Vercel'da. Local dev'de Vite proxy /api → localhost:3000.
-const API_BASE = window.location.hostname === 'localhost' ? '' : 'https://efekt-finans.onrender.com';
+// API_BASE empty string olmalı ki aynı sunucudan çeksin.
+const API_BASE = '';
 
 const GLOSSARY = {
   pe: <><strong>F/K (Fiyat / Kazanç):</strong> Şirketin piyasa değerinin yıllık net kâra bölümü.<br/><strong>Formül:</strong> Piyasa Değeri / Net Kâr<br/><strong>Yorum:</strong> Düşük F/K genellikle ucuz, ama sektör bağımlı. BIST için &lt;10 ucuz sayılır.</>,
@@ -140,7 +140,7 @@ const safeLocalStorage = {
 
 function getSessionId() {
   let id = safeLocalStorage.getItem('efekt-session-id');
-  if (!id) { id = crypto.randomUUID(); safeLocalStorage.setItem('efekt-session-id', id); }
+  if (!id) { id = (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Math.random().toString(36).substring(2)); safeLocalStorage.setItem('efekt-session-id', id); }
   return id;
 }
 const sessionId = getSessionId();
@@ -169,7 +169,7 @@ export default function App() {
     }
   }, [theme]);
 
-  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'derinrapor'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'|'backtest'|'alerts'|'macro'>('quarterly');
+  const [activeTab, setActiveTab] = useState<'quarterly'|'annual'|'charts'|'ai'|'derinrapor'|'compare'|'fund'|'watchlist'|'agenda'|'assistant'|'portfolio'|'kap'|'screener'|'global'|'heatmap'|'backtest'|'alerts'|'macro'|'paper-trader'>('quarterly');
   const [tickerInput, setTickerInput] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -567,7 +567,7 @@ export default function App() {
       });
       const data = await res.json();
       if (data && data.ticker && data.price && data.condition) {
-        setAlerts(p => [...p, { id: crypto.randomUUID(), ticker: data.ticker, condition: data.condition, price: Number(data.price), createdAt: new Date().toISOString() }]);
+        setAlerts(p => [...p, { id: (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Math.random().toString(36).substring(2)), ticker: data.ticker, condition: data.condition, price: Number(data.price), createdAt: new Date().toISOString() }]);
         setSmartAlertInput('');
         alert(`Akıllı Alarm Başarıyla Kuruldu: ${data.ticker} ${data.condition === 'above' ? '≥' : '≤'} ${data.price} ₺`);
       } else {
@@ -642,6 +642,53 @@ export default function App() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [assistantMessages, assistantStatus]);
+
+  
+  const [paperPortfolio, setPaperPortfolio] = useState<any>(null);
+  const [paperLogs, setPaperLogs] = useState<string>('');
+  const [isPaperTraderRunning, setIsPaperTraderRunning] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'paper-trader') {
+      fetch(`${API_BASE}/api/paper-portfolio`)
+        .then(r => r.json())
+        .then(setPaperPortfolio)
+        .catch(console.error);
+    }
+  }, [activeTab]);
+
+  const runPaperTrader = async () => {
+    setIsPaperTraderRunning(true);
+    setPaperLogs('🤖 Fon Yöneticisi uyanıyor...\n');
+    try {
+      const res = await fetch(`${API_BASE}/api/paper-trader/run`, { method: 'POST' });
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let chunk = await reader.read();
+        while (!chunk.done) {
+          const lines = decoder.decode(chunk.value).split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              if (dataStr === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.chunk) setPaperLogs(prev => prev + parsed.chunk);
+                if (parsed.error) setPaperLogs(prev => prev + '\n[HATA] ' + parsed.error);
+              } catch (e) {}
+            }
+          }
+          chunk = await reader.read();
+        }
+      }
+    } catch (e: any) {
+      setPaperLogs(prev => prev + '\n[SİSTEM HATASI] ' + e.message);
+    } finally {
+      setIsPaperTraderRunning(false);
+      fetch(`${API_BASE}/api/paper-portfolio`).then(r => r.json()).then(setPaperPortfolio).catch(console.error);
+    }
+  };
 
   const didMountRef = useRef(false);
 
@@ -1237,6 +1284,7 @@ export default function App() {
             { id: 'stocks', label: 'Hisseler', icon: BarChart, active: !!data && activeTab !== 'fund' && activeTab !== 'backtest' && activeTab !== 'kap' && activeTab !== 'alerts' && activeTab !== 'macro' },
             { id: 'watchlist', label: 'İzleme Listesi', icon: List, active: activeTab === 'watchlist' },
             { id: 'portfolio', label: 'Portföyüm', icon: Briefcase, active: activeTab === 'portfolio' },
+            { id: 'paper-trader', label: '🤖 Fon Botu', icon: BrainCircuit, active: activeTab === 'paper-trader' },
             { id: 'backtest', label: 'Backtest', icon: Activity, active: activeTab === 'backtest' },
             { id: 'alerts', label: 'Akıllı Alarmlar', icon: BellRing, active: activeTab === 'alerts' },
             { id: 'kap', label: 'KAP Canlı', icon: Bell, active: activeTab === 'kap' },
@@ -1253,6 +1301,7 @@ export default function App() {
                 if (item.id === 'stocks') { if (!data) loadStock('THYAO'); setActiveTab('quarterly'); }
                 if (item.id === 'watchlist') { setActiveTab('watchlist'); }
                 if (item.id === 'portfolio') { setActiveTab('portfolio'); }
+                if (item.id === 'paper-trader') { setData(null); setActiveTab('paper-trader'); }
                 if (item.id === 'backtest') { setData(null); setActiveTab('backtest'); }
                 if (item.id === 'alerts') { setData(null); setActiveTab('alerts'); }
                 if (item.id === 'kap') { setData(null); setActiveTab('kap'); }
@@ -2155,7 +2204,7 @@ export default function App() {
                         if (!above) return;
                         const v = parseFloat(above);
                         if (isNaN(v)) return;
-                        setAlerts(p => [...p, { id: crypto.randomUUID(), ticker: data.ticker, condition: 'above', price: v, createdAt: new Date().toISOString() }]);
+                        setAlerts(p => [...p, { id: (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Math.random().toString(36).substring(2)), ticker: data.ticker, condition: 'above', price: v, createdAt: new Date().toISOString() }]);
                         alert(`Uyarı kuruldu: ${data.ticker} ≥ ${v} ₺`);
                       }} style={{backgroundColor:'transparent', border:'1px solid var(--glass-border)', borderRadius:8, padding:'8px 16px', color:'var(--text-main)', cursor:'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background-color 0.2s'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     Uyarı Kur
@@ -2721,7 +2770,93 @@ export default function App() {
 
             </div>
           )}
-        </main>
+        
+        {activeTab === 'paper-trader' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+                  <BrainCircuit className="text-blue-400" />
+                  Sanal Fon Botu
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">Amerikan borsalarında otonom al-sat yapan yapay zeka yöneticisi.</p>
+              </div>
+              <button
+                onClick={runPaperTrader}
+                disabled={isPaperTraderRunning}
+                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isPaperTraderRunning ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                {isPaperTraderRunning ? 'Bot Çalışıyor...' : 'Botu Şimdi Tetikle'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                <p className="text-sm text-slate-400 mb-1">Kasa (Nakit)</p>
+                <div className="text-3xl font-bold text-slate-100">
+                  $ {paperPortfolio?.balance?.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) || '0.00'}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                <p className="text-sm text-slate-400 mb-1">Toplam Varlık Değeri</p>
+                <div className="text-3xl font-bold text-blue-400">
+                  $ {
+                    ((paperPortfolio?.balance || 0) + Object.values(paperPortfolio?.positions || {}).reduce((sum: number, pos: any) => sum + (pos.shares * pos.avgCost), 0)).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
+                  }
+                </div>
+              </div>
+            </div>
+
+            {paperPortfolio?.positions && Object.keys(paperPortfolio.positions).length > 0 && (
+              <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/80">
+                  <h3 className="font-semibold text-slate-200">Açık Pozisyonlar</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left text-slate-300">
+                    <thead className="text-xs text-slate-400 uppercase bg-slate-800/50 border-b border-slate-700/50">
+                      <tr>
+                        <th className="px-6 py-3 font-medium">Hisse</th>
+                        <th className="px-6 py-3 font-medium text-right">Adet</th>
+                        <th className="px-6 py-3 font-medium text-right">Ort. Maliyet</th>
+                        <th className="px-6 py-3 font-medium text-right">Toplam Değer</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/50">
+                      {Object.values(paperPortfolio.positions).map((pos: any) => (
+                        <tr key={pos.ticker} className="hover:bg-slate-800/50 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-200">{pos.ticker}</td>
+                          <td className="px-6 py-4 text-right">{pos.shares}</td>
+                          <td className="px-6 py-4 text-right">$ {pos.avgCost.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-right text-blue-400 font-medium">$ {(pos.shares * pos.avgCost).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {paperLogs && (
+              <div className="bg-[#0f111a] rounded-2xl border border-slate-700/50 overflow-hidden mt-6">
+                <div className="px-4 py-2 border-b border-slate-800 flex items-center gap-2 bg-[#1a1d27]">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400 ml-2">paper-trader.ts</span>
+                </div>
+                <div className="p-4 overflow-x-auto">
+                  <pre className="font-mono text-xs text-emerald-400 whitespace-pre-wrap leading-relaxed">{paperLogs}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+</main>
       </div>
 
       {/* FLOATING AI ASSISTANT WIDGET */}

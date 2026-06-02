@@ -57,6 +57,7 @@ yarn-error.log*
 
 
 logs/
+*.log
 coverage.json
 
 # Scratchpad files

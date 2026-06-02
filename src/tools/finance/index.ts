@@ -8,7 +8,9 @@ export { getInsiderTrades } from './insider_trades';
 export { getInstitutionalHoldings, getInstitutionalInvestors } from './institutional_holdings';
 export { getEarnings } from './earnings';
 export { createGetFinancials } from './get-financials';
+export { getPortfolioTool, buyPortfolioTool, sellPortfolioTool, PORTFOLIO_GET_DESCRIPTION, PORTFOLIO_BUY_DESCRIPTION, PORTFOLIO_SELL_DESCRIPTION } from './portfolio';
 export { createGetMarketData } from './get-market-data';
 export { createReadFilings } from './read-filings';
 export { createScreenStocks } from './screen-stocks';
+export { getChronosForecast, CHRONOS_FORECAST_DESCRIPTION } from './chronos-forecast';
 

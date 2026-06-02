@@ -69,10 +69,19 @@ export class Agent {
     this.messageQueue = config.messageQueue;
   }
 
+  /** Bu agent'a bağlı tüm araç adları (base filtresi + extraTools sonrası). Test/inceleme için. */
+  getToolNames(): string[] {
+    return this.tools.map(t => t.name);
+  }
+
+
   static async create(config: AgentConfig = {}): Promise<Agent> {
     const model = config.model ?? DEFAULT_MODEL;
     const baseTools = getTools(model);
-    const tools = [...baseTools, ...(config.extraTools ?? [])];
+    const filteredBase = config.allowedToolNames
+      ? baseTools.filter(t => config.allowedToolNames!.includes(t.name))
+      : baseTools;
+    const tools = [...filteredBase, ...(config.extraTools ?? [])];
     const concurrencyMap = getToolConcurrencyMap(model);
     for (const t of config.extraTools ?? []) {
       concurrencyMap.set(t.name, config.extraToolsConcurrency?.get(t.name) ?? false);

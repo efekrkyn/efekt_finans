@@ -27,7 +27,7 @@ export interface ReportBundle {
   currentPrice: number;
   marketCap: number;
   currency: string;
-  dataSource: 'fmp' | 'isyatirim-fallback';
+  dataSource: 'yahoo' | 'isyatirim-fallback' | 'fmp';
   tier: DataTier;
   multiples: { trailingPE?: number; priceToBook?: number; evToEbitda?: number };
   scorecard: BISTAnalysisResult['scorecard'];
@@ -49,7 +49,7 @@ export interface ReportBundle {
 }
 
 /** dataSource → veri katmanı. İş Yatırım fallback'i finansal periyot içermez. */
-export function mapTier(dataSource?: 'fmp' | 'isyatirim-fallback'): DataTier {
+export function mapTier(dataSource?: 'yahoo' | 'isyatirim-fallback' | 'fmp'): DataTier {
   return dataSource === 'isyatirim-fallback' ? 'kısıtlı' : 'tam';
 }
 
@@ -154,9 +154,9 @@ export async function getReportBundle(
     dataSource: financials.dataSource ?? 'fmp',
     tier: mapTier(financials.dataSource),
     multiples: {
-      trailingPE: financials.trailingPE,
-      priceToBook: financials.priceToBook,
-      evToEbitda: financials.evToEbitda,
+      trailingPE: financials.multiples?.trailingPE,
+      priceToBook: financials.multiples?.priceToBook,
+      evToEbitda: financials.multiples?.evToEbitda,
     },
     scorecard: financials.scorecard,
     technicals: financials.technicalIndicators,

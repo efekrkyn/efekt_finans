@@ -7,6 +7,8 @@ import { checkEnv } from './utils/env-check';
 import { fmpClient } from './utils/fmp.js';
 
 checkEnv();
+process.on('unhandledRejection', r => console.error('unhandledRejection', String(r)));
+process.on('uncaughtException', e => console.error('uncaughtException', (e as Error)?.message));
 import { callLlm, streamLlmWithMessages } from './model/llm';
 import { InMemoryChatHistory } from './utils/in-memory-chat-history';
 // Agent lazy import edilir (sadece /api/chat içinde) — agent zinciri
@@ -330,9 +332,13 @@ export async function fetchHandler(req: Request): Promise<Response> {
       
       if (!rateLimit(req, 10, 60000)) return new Response('Rate limited', {status:429, headers:{'Access-Control-Allow-Origin':'*'}});
       
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const startTime = Date.now();
             log('info', 'ai-analysis', { ticker });
@@ -342,9 +348,20 @@ export async function fetchHandler(req: Request): Promise<Response> {
             log('info', 'tavily_search', { query });
             const searchResults = await searchTavily(query);
             
+            let chronosText = 'Chronos tahmini alınamadı veya hesaplanıyor.';
+            try {
+              log('info', 'chronos_forecast', { ticker });
+              const { getChronosForecast } = await import('./tools/finance/chronos-forecast.js');
+              const chronosTicker = ticker.includes('.') ? ticker : `${ticker}.IS`;
+              const result = await getChronosForecast.func({ ticker: chronosTicker, days: 30 });
+              chronosText = typeof result === 'string' ? result : String(result);
+            } catch (e) {
+              log('error', 'chronos_error', { error: (e as Error).message });
+            }
+            
             const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
             const prompt = `
-Aşağıda Borsa İstanbul'da işlem gören ${financials.companyName} (${financials.ticker}) şirketine ait en güncel finansal veriler ve internetten derlenen son haberler yer almaktadır.
+Aşağıda Borsa İstanbul'da işlem gören ${financials.companyName} (${financials.ticker}) şirketine ait en güncel finansal veriler, Chronos AI tahminleri ve internetten derlenen son haberler yer almaktadır.
 
 Lütfen raporunun tam en başına hazırlayan bilgisini ve rapor tarihini şu şekilde ekle:
 Hazırlayan: BIST Finansal Analisti & Portföy Yöneticisi
@@ -353,9 +370,9 @@ Tarih: ${today}
 ### HİSSE PİYASA VERİLERİ:
 - Güncel Fiyat: ${financials.currentPrice} TRY
 - Piyasa Değeri: ${financials.marketCap}
-- F/K Oranı: ${financials.trailingPE || 'Veri Yok'}
-- PD/DD Oranı: ${financials.priceToBook || 'Veri Yok'}
-- FD/FAVÖK Oranı: ${financials.evToEbitda || 'Veri Yok'}
+- F/K Oranı: ${financials.multiples?.trailingPE?.toFixed(1) || 'Veri Yok'}
+- PD/DD Oranı: ${financials.multiples?.priceToBook?.toFixed(1) || 'Veri Yok'}
+- FD/FAVÖK Oranı: ${financials.multiples?.evToEbitda?.toFixed(1) || 'Veri Yok'}
 
 ### ÇEYREKLİK PERFORMANS DEĞİŞİMLERİ (Fintables Karnesi):
 - Satışlar Çeyreklik Büyüme (QoQ): ${financials.scorecard.revenueGrowthQoQ?.toFixed(1) || 'Veri Yok'}%
@@ -368,11 +385,14 @@ Tarih: ${today}
 ### İNTERNETTEN ALINAN SON HABERLER / GELİŞMELER:
 ${searchResults}
 
+### CHRONOS AI 30 GÜNLÜK FİYAT TAHMİNİ (MAKİNE ÖĞRENMESİ):
+${chronosText}
+
 ### GÖREV:
-Bu verileri ve haberleri detaylıca analiz et. Şunları içeren profesyonel bir Türkçe analiz raporu yaz:
+Bu verileri, haberleri ve Chronos makine öğrenmesi tahminini detaylıca analiz et. Şunları içeren profesyonel bir Türkçe analiz raporu yaz:
 1. **Finansal Sağlık Değerlendirmesi:** Gelir tablosu, büyüme oranları ve çarpanların (F/K, PD/DD) durumunu yorumla.
 2. **Haber ve Gelişmelerin Yorumu:** İnternetten derlenen haberlerin hisse üzerindeki olumlu/olumsuz etkilerini analiz et.
-3. **Gelecek Beklentisi ve Tahmin:** Şirketin önümüzdeki dönemdeki performansı ve hisse senedinin yönü hakkında profesyonel, objektif bir tahminde bulun. Yatırım tavsiyesi olmadığını belirt.
+3. **Gelecek Beklentisi ve Tahmin:** Şirketin önümüzdeki dönemdeki performansı ve hisse senedinin yönü hakkında profesyonel bir tahminde bulun. Chronos 30 Günlük fiyat hedeflerini mutlaka yorumuna dahil et. Yatırım tavsiyesi olmadığını belirt.
 
 Analizini markdown formatında yaz. Profesyonel, net ve finansal jargona uygun olsun.
 
@@ -386,21 +406,22 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-chat' });
+            ], { model: 'deepseek-chat', signal: req.signal });
 
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (typeof content === 'string' && content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ analysisChunk: content })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ analysisChunk: content })}\n\n`);
               }
             }
-            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-            controller.close();
+            safeEnqueue(`data: [DONE]\n\n`);
+            safeClose();
             log('info', 'ai-analysis_done', { ticker, durationMs: Date.now() - startTime });
           } catch (err) {
             log('error', 'ai-analysis_error', { error: (err as Error).message });
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {
@@ -431,11 +452,15 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
       const symbol = ticker.toUpperCase();
       const cacheKey = `deep-report:${symbol}:${discountRate.toFixed(2)}`;
 
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
-          const send = (obj: any) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
-          const done = () => controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
+          const send = (obj: any) => safeEnqueue(`data: ${JSON.stringify(obj)}\n\n`);
+          const done = () => safeEnqueue('data: [DONE]\n\n');
           try {
             const startTime = Date.now();
             log('info', 'deep-report', { ticker: symbol, discountRate });
@@ -447,7 +472,7 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
               const txt: string = cached.text;
               for (let i = 0; i < txt.length; i += 400) send({ chunk: txt.slice(i, i + 400) });
               done();
-              controller.close();
+              safeClose();
               log('info', 'deep-report_cache_hit', { ticker: symbol });
               return;
             }
@@ -575,10 +600,11 @@ Değerlerin toplamı 100 olmalı.`;
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin. Yalnızca sana verilen kesin sayıları kullanırsın; rakam uydurmazsın.'),
               new HumanMessage(prompt),
-            ], { model: 'deepseek-chat' });
+            ], { model: 'deepseek-chat', signal: req.signal });
 
             let fullText = '';
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (typeof content === 'string' && content) {
                 fullText += content;
@@ -587,12 +613,12 @@ Değerlerin toplamı 100 olmalı.`;
             }
             cacheSet(cacheKey, { summary, text: fullText }, 30 * 60 * 1000);
             done();
-            controller.close();
+            safeClose();
             log('info', 'deep-report_done', { ticker: symbol, durationMs: Date.now() - startTime, tier: bundle.tier, dcfFeasible: d.feasible });
           } catch (err) {
             log('error', 'deep-report_error', { error: (err as Error).message });
             send({ error: (err as Error).message });
-            controller.close();
+            safeClose();
           }
         }
       }), {
@@ -840,9 +866,9 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
               ticker: d.ticker,
               companyName: d.companyName,
               currentPrice: d.currentPrice,
-              trailingPE: d.trailingPE,
-              priceToBook: d.priceToBook,
-              evToEbitda: d.evToEbitda,
+              trailingPE: d.multiples?.trailingPE,
+              priceToBook: d.multiples?.priceToBook,
+              evToEbitda: d.multiples?.evToEbitda,
               revenueGrowthYoY: d.scorecard?.revenueGrowthYoY,
               netIncomeGrowthYoY: d.scorecard?.netIncomeGrowthYoY,
               ebitdaGrowthYoY: d.scorecard?.ebitdaGrowthYoY,
@@ -1039,13 +1065,87 @@ Yanıtını çok şık ve temiz bir **markdown** formatında, listeler, başlık
       }
     }
 
+    if (path === '/api/paper-portfolio' && req.method === 'GET') {
+      try {
+        let pf;
+        if (process.env.ALPACA_API_KEY) {
+          const { getAlpacaPortfolio } = await import('./portfolio/alpaca');
+          pf = await getAlpacaPortfolio();
+        } else {
+          const { readPortfolio } = await import('./portfolio/store');
+          pf = readPortfolio();
+        }
+        return new Response(JSON.stringify(pf), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+
+    if (path === '/api/paper-trader/run' && req.method === 'POST') {
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
+        async start(controller) {
+          const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
+
+          try {
+            const { spawn } = await import('child_process');
+            const bunPath = process.env.BUN_PATH || 'bun';
+            const child = spawn(bunPath, ['run', 'scripts/paper-trader.ts'], { cwd: process.cwd() });
+            
+            child.stdout.on('data', (data: Buffer) => {
+              const text = data.toString('utf-8');
+              safeEnqueue(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+            });
+            child.stderr.on('data', (data: Buffer) => {
+              const text = data.toString('utf-8');
+              safeEnqueue(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+            });
+            child.on('close', (code: number) => {
+              safeEnqueue(`data: [DONE]\n\n`);
+              safeClose();
+            });
+            child.on('error', (err: any) => {
+              console.error(err);
+              safeEnqueue(`data: ${JSON.stringify({ error: 'Paper-trader çalıştırılamadı.' })}\n\n`);
+              safeClose();
+            });
+
+            // Handle client disconnect
+            req.signal.addEventListener('abort', () => {
+              closed = true;
+              child.kill('SIGKILL');
+            });
+          } catch (err: any) {
+            console.error(err);
+            safeEnqueue(`data: ${JSON.stringify({ error: 'Paper-trader çalıştırılamadı.' })}\n\n`);
+            safeClose();
+          }
+        }
+      }), {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
     if (path === '/api/portfolio-optimize' && req.method === 'POST') {
       const authErr = requireApiKey();
       if (authErr) return authErr;
       
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const body = await req.json() as { portfolio: any[] };
             const portfolio = body.portfolio || [];
@@ -1076,19 +1176,20 @@ Raporunu Markdown formatında şu başlıklarla hazırla:
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analisti ve portföy yöneticisisin.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-v4-pro' });
+            ], { model: 'deepseek-v4-pro', signal: req.signal });
 
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ chunk: content })}\n\n`);
               }
             }
-            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-            controller.close();
+            safeEnqueue(`data: [DONE]\n\n`);
+            safeClose();
           } catch (err) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {
@@ -1134,9 +1235,13 @@ Raporunu Markdown formatında şu başlıklarla hazırla:
       const authErr = requireApiKey();
       if (authErr) return authErr;
       
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const body = await req.json() as { portfolio: any[], monthlyAddition: number };
             const portfolio = body.portfolio || [];
@@ -1155,19 +1260,20 @@ Raporu Markdown formatında hazırla. Özellikle şunlara değin:
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST Temettü Emeklilik analistisin.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-v4-pro' });
+            ], { model: 'deepseek-v4-pro', signal: req.signal });
 
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ chunk: content })}\n\n`);
               }
             }
-            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-            controller.close();
+            safeEnqueue(`data: [DONE]\n\n`);
+            safeClose();
           } catch (err) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {
@@ -1184,9 +1290,13 @@ Raporu Markdown formatında hazırla. Özellikle şunlara değin:
       const authErr = requireApiKey();
       if (authErr) return authErr;
       
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const currentDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
             const query = `Türkiye makroekonomi ${currentDate} güncel enflasyon TCMB faiz kararı dolar kuru beklentileri borsa istanbul etkisi`;
@@ -1198,19 +1308,20 @@ Raporu Markdown formatında hazırla. Özellikle şunlara değin:
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir makroekonomistsin.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-v4-pro' });
+            ], { model: 'deepseek-v4-pro', signal: req.signal });
 
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ chunk: content })}\n\n`);
               }
             }
-            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-            controller.close();
+            safeEnqueue(`data: [DONE]\n\n`);
+            safeClose();
           } catch (err) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {
@@ -1255,9 +1366,13 @@ Kullanıcı metni: "${body.query}"`;
       const authErr = requireApiKey();
       if (authErr) return authErr;
       
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const query = `Borsa İstanbul ${ticker} şirketi sektörü ve en büyük 3 rakibi, güncel kıyaslamaları ve pazar payı`;
             log('info', 'tavily_search', { query });
@@ -1268,19 +1383,20 @@ Kullanıcı metni: "${body.query}"`;
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analistisin.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-v4-pro' });
+            ], { model: 'deepseek-v4-pro', signal: req.signal });
 
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ chunk: content })}\n\n`);
               }
             }
-            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-            controller.close();
+            safeEnqueue(`data: [DONE]\n\n`);
+            safeClose();
           } catch (err) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {
@@ -1297,9 +1413,13 @@ Kullanıcı metni: "${body.query}"`;
       const authErr = requireApiKey();
       if (authErr) return authErr;
       
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
           const encoder = new TextEncoder();
+          /* closed flag moved out */
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
             const query = `Borsa İstanbul güncel KAP (Kamuyu Aydınlatma Platformu) bildirimleri ve şirket haberleri ${today}`;
@@ -1325,19 +1445,20 @@ Markdown formatında hazırla.
             const stream = streamLlmWithMessages([
               new SystemMessage('Sen uzman bir BIST finansal analisti ve haber editörüsün.'),
               new HumanMessage(prompt)
-            ], { model: 'deepseek-chat' });
+            ], { model: 'deepseek-chat', signal: req.signal });
 
             for await (const chunk of stream) {
+              if (req.signal.aborted) break;
               const content = chunk.content;
               if (content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: content })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ chunk: content })}\n\n`);
               }
             }
-            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-            controller.close();
+            safeEnqueue(`data: [DONE]\n\n`);
+            safeClose();
           } catch (err) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (err as Error).message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {
@@ -1352,8 +1473,13 @@ Markdown formatında hazırla.
 
     // 3. API: Advanced AI Chat with Efekt Agent (SSE)
     if (path === '/api/chat' && req.method === 'POST') {
-      return new Response(new ReadableStream({
+      let closed = false; return new Response(new ReadableStream({
+        cancel() { closed = true; },
         async start(controller) {
+          /* closed flag moved out */
+          const encoder = new TextEncoder();
+          const safeEnqueue = (s: string) => { if (closed) return; try { controller.enqueue(encoder.encode(s)); } catch { closed = true; } };
+          const safeClose   = () => { if (closed) return; closed = true; try { controller.close(); } catch {} };
           try {
             const body = await req.json() as { query?: string, sessionId?: string, model?: string, context?: string, history?: { role: string, content: string }[] };
             const query = body.query;
@@ -1362,8 +1488,8 @@ Markdown formatında hazırla.
             const sessionId = body.sessionId || 'default';
             const selectedModel = body.model || 'deepseek-v4-pro';
             if (!query) {
-              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error', error: 'Query is required' })}\n\n`));
-              controller.close();
+              safeEnqueue(`data: ${JSON.stringify({ type: 'error', error: 'Query is required' })}\n\n`);
+              safeClose();
               return;
             }
 
@@ -1382,38 +1508,43 @@ Markdown formatında hazırla.
             const { DASHBOARD_ACTION_TOOLS, DASHBOARD_ACTION_TOOL_NAMES } = await import('./tools/dashboard/index');
             const { mapActionEvent } = await import('./utils/dashboard-action-event');
 
+            
             const agent = await Agent.create({
               model: selectedModel,
               memoryEnabled: false,
+              signal: req.signal,
               extraTools: DASHBOARD_ACTION_TOOLS,
+              allowedToolNames: ['get_financials', 'get_market_data', 'read_filings', 'screen_stocks', 'web_search'],
             });
+
             let fullAnswer = '';
 
             for await (const event of agent.run(finalQuery, history)) {
+              if (req.signal.aborted) break;
               if (event.type === 'thinking') {
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'thinking', message: event.message })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ type: 'thinking', message: event.message })}\n\n`);
               } else if (event.type === 'tool_start') {
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'tool_start', tool: event.tool, args: event.args })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ type: 'tool_start', tool: event.tool, args: event.args })}\n\n`);
                 if (DASHBOARD_ACTION_TOOL_NAMES.has(event.tool)) {
                   const actionEvent = mapActionEvent(event.tool, event.args);
                   if (actionEvent) {
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(actionEvent)}\n\n`));
+                    safeEnqueue(`data: ${JSON.stringify(actionEvent)}\n\n`);
                   }
                 }
               } else if (event.type === 'done') {
                 fullAnswer = event.answer || '';
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'done', answer: event.answer })}\n\n`));
+                safeEnqueue(`data: ${JSON.stringify({ type: 'done', answer: event.answer })}\n\n`);
               } else if (event.type === 'stream_progress') {
                 // If stream progress wants to be sent
               }
             }
 
 
-            controller.close();
+            safeClose();
           } catch (err: any) {
             console.error('[API] Chat error:', err);
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`));
-            controller.close();
+            safeEnqueue(`data: ${JSON.stringify({ type: 'error', error: 'İşlem sırasında bir hata oluştu.' })}\n\n`);
+            safeClose();
           }
         }
       }), {

@@ -58,6 +58,8 @@ export interface AgentConfig {
   memoryEnabled?: boolean;
   /** Message queue for mid-run injection of new user messages. */
   messageQueue?: MessageQueue;
+  /** If set, filters the base registry tools to ONLY those in this list (extraTools are always included). */
+  allowedToolNames?: string[];
   /** Additional tools specifically injected for this agent instance */
   extraTools?: import('@langchain/core/tools').StructuredToolInterface[];
   /** Concurrency safe map for extra tools */
