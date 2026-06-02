@@ -305,6 +305,56 @@ export async function fetchHandler(req: Request): Promise<Response> {
       }
     }
 
+    // 1.1c. API: İş Yatırım Finansal Tablolar (isyatirimhisse)
+    if (path === '/api/isyatirim-financials') {
+      const ticker = url.searchParams.get('ticker') || url.searchParams.get('symbol');
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      try {
+        const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+        const startYear = url.searchParams.get('start_year') || String(new Date().getFullYear() - 2);
+        const endYear = url.searchParams.get('end_year') || String(new Date().getFullYear());
+        const { stdout } = await execFileAsync(pyEnv, ['src/python/isyatirim_fetcher.py', ticker, startYear, endYear], { timeout: 20000 });
+        const data = JSON.parse(stdout);
+        return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    // 1.1d. API: Gelişmiş Rasyo Analizi (FinanceToolkit + DefeatBeta)
+    if (path === '/api/advanced-ratios') {
+      const ticker = url.searchParams.get('ticker') || url.searchParams.get('symbol');
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      try {
+        const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+        const args = ['src/python/finance_toolkit_proxy.py', ticker];
+        const fmpKey = process.env.FMP_API_KEY;
+        if (fmpKey) args.push(fmpKey);
+        const { stdout } = await execFileAsync(pyEnv, args, { timeout: 30000 });
+        // Filter out defeatbeta banner noise
+        const lines = stdout.split('\n');
+        const jsonLine = lines.find(l => l.trim().startsWith('{'));
+        const data = JSON.parse(jsonLine || '{}');
+        return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    // 1.1e. API: AlphaAnalyst Emsal (Peer) Karşılaştırma
+    if (path === '/api/alpha-analyst-peers') {
+      const ticker = url.searchParams.get('ticker') || url.searchParams.get('symbol');
+      if (!ticker) return new Response(JSON.stringify({error:'ticker zorunlu'}), {status:400, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      try {
+        const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+        const { stdout } = await execFileAsync(pyEnv, ['src/python/alpha_analyst_peers.py', ticker], { timeout: 20000 });
+        const data = JSON.parse(stdout);
+        return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
     // 1.2. API: Yabancı varlık (ABD hisse, döviz, kripto)
     if (path === '/api/asset') {
       const symbol = url.searchParams.get('symbol');
@@ -498,6 +548,19 @@ Değerlerin toplamı 100 olmalıdır. Bu satır dışında raporun geri kalanı 
 
             const bundle = await getReportBundle(symbol, { discountRate, search: searchTavily });
 
+            // Gelişmiş rasyoları paralel çek (deep report zenginleştirme)
+            let advancedRatios: any = null;
+            try {
+              const pyEnv = (globalThis as any).Bun?.env?.VIRTUAL_ENV ? `${(globalThis as any).Bun.env.VIRTUAL_ENV}/bin/python` : '.venv/bin/python';
+              const arArgs = ['src/python/finance_toolkit_proxy.py', symbol];
+              const fmpKey = process.env.FMP_API_KEY;
+              if (fmpKey) arArgs.push(fmpKey);
+              const { stdout: arOut } = await execFileAsync(pyEnv, arArgs, { timeout: 20000 });
+              const arLines = arOut.split('\n');
+              const arJson = arLines.find(l => l.trim().startsWith('{'));
+              if (arJson) advancedRatios = JSON.parse(arJson);
+            } catch { /* gelişmiş rasyolar opsiyonel */ }
+
             const humanizeTRY = (n?: number): string => {
               if (n === undefined || n === null || !isFinite(n)) return 'Veri Yok';
               const abs = Math.abs(n);
@@ -612,6 +675,12 @@ ${techBlock}
 
 ### YAPAY ZEKA TAHMİNİ (Chronos ML)
 ${chronosBlock}
+
+### GELİŞMİŞ RASYOLAR (DefeatBeta/FinanceToolkit)
+${advancedRatios && !advancedRatios.error ? `Kaynak: ${advancedRatios.source}
+${advancedRatios.profitability && Object.keys(advancedRatios.profitability).length > 0 ? `Kârlılık: ${Object.entries(advancedRatios.profitability).map(([k,v]) => `${k}=${v}`).join(' | ')}` : ''}
+${advancedRatios.solvency && Object.keys(advancedRatios.solvency).length > 0 ? `Borçluluk: ${Object.entries(advancedRatios.solvency).map(([k,v]) => `${k}=${v}`).join(' | ')}` : ''}
+${advancedRatios.valuation && Object.keys(advancedRatios.valuation).length > 0 ? `Değerleme: ${Object.entries(advancedRatios.valuation).map(([k,v]) => `${k}=${typeof v === 'number' && v > 1e9 ? humanizeTRY(v as number) : v}`).join(' | ')}` : ''}` : '- Gelişmiş rasyo verisi mevcut değil.'}
 
 ### DURUŞ (kodda): ${bundle.stance.label} — ${bundle.stance.rationale}
 

@@ -16,6 +16,7 @@ import { READ_FILINGS_DESCRIPTION } from './finance/read-filings';
 import { SCREEN_STOCKS_DESCRIPTION } from './finance/screen-stocks';
 import { CHRONOS_FORECAST_DESCRIPTION } from './finance/chronos-forecast';
 import { kapAgentTool, KAP_AGENT_DESCRIPTION } from './finance/kap-agent';
+import { getTefasFundData } from './finance/tefas-agent';
 import { heartbeatTool, HEARTBEAT_TOOL_DESCRIPTION } from './heartbeat/heartbeat-tool';
 import { cronTool, CRON_TOOL_DESCRIPTION } from './cron/cron-tool';
 import { memoryGetTool, MEMORY_GET_DESCRIPTION, memorySearchTool, MEMORY_SEARCH_DESCRIPTION, memoryUpdateTool, MEMORY_UPDATE_DESCRIPTION } from './memory/index';
@@ -108,6 +109,13 @@ export function getToolRegistry(model: string): RegisteredTool[] {
       description: PORTFOLIO_SELL_DESCRIPTION,
       compactDescription: 'Sell shares of a US stock in the virtual paper trading portfolio.',
       concurrencySafe: false,
+    },
+    {
+      name: 'get_tefas_fund_data',
+      tool: getTefasFundData,
+      description: 'TEFAS üzerinden yatırım fonlarının güncel fiyat, getiri ve büyüklük verilerini getirir. Fon analizlerinde kullanılır.',
+      compactDescription: 'Fetch TEFAS investment fund data including price and portfolio size.',
+      concurrencySafe: true,
     },
     {
       name: 'web_fetch',
