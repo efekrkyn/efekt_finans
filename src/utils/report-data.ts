@@ -12,6 +12,7 @@
 import { fetchBISTData, type BISTAnalysisResult } from './bist-data';
 import { computeDcf, type DcfResult } from './dcf';
 import type { TechnicalIndicators } from './technical-indicators';
+import { computeValuationMetrics, type ValuationMetrics } from './valuation-metrics';
 
 export type DataTier = 'tam' | 'kısıtlı';
 export type StanceLabel = 'Pozitif' | 'Nötr' | 'Negatif';
@@ -46,6 +47,7 @@ export interface ReportBundle {
   peerContext: string | null;
   targetRange: { low: number; high: number; basis: 'dcf' | 'teknik' } | null;
   stance: { label: StanceLabel; rationale: string };
+  valuation?: ValuationMetrics;
 }
 
 /** dataSource → veri katmanı. İş Yatırım fallback'i finansal periyot içermez. */
@@ -176,5 +178,14 @@ export async function getReportBundle(
     peerContext,
     targetRange: deriveTargetRange(dcf, financials.historicalPrices),
     stance,
+    valuation: computeValuationMetrics({
+      marketCap: financials.marketCap,
+      freeCashFlow: base?.freeCashFlow,
+      ebitda: base?.ebitda,
+      netDebt: base?.netDebt,
+      netIncome: base?.netIncome,
+      totalRevenue: base?.totalRevenue,
+      revenueGrowthYoY: financials.scorecard.revenueGrowthYoY
+    }),
   };
 }

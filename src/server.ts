@@ -535,6 +535,14 @@ ${t.bollinger ? `- Bollinger(20,2): Üst ${num(t.bollinger.upper)} / Orta ${num(
             const targetBlock = tr
               ? `${num(tr.low)} – ${num(tr.high)} TL (dayanak: ${tr.basis === 'dcf' ? 'DCF duyarlılık aralığı' : '52-hafta teknik bant'})`
               : 'Hesaplanamadı';
+            const v = bundle.valuation;
+            const valuationBlock = v
+              ? `- FCF Verimi: ${v.fcfYield !== undefined ? pctDec(v.fcfYield) : 'Veri Yok'}
+- Net Borç/FAVÖK: ${v.netDebtToEbitda !== undefined ? num(v.netDebtToEbitda, 2) : 'Veri Yok'}
+- FAVÖK Marjı: ${v.ebitdaMargin !== undefined ? pctDec(v.ebitdaMargin) : 'Veri Yok'}
+- EV/FCF: ${v.evToFcf !== undefined ? num(v.evToFcf, 1) : 'Veri Yok'}
+- Kalite Skoru: ${v.qualityScore}/${v.qualityMax} (${v.qualityLabel})`
+              : '- Değerleme verisi hesaplanamadı';
 
             const today = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
             const prompt = `Bugünün tarihi: ${today}.
@@ -565,6 +573,9 @@ ${bundle.latestFinancials ? `- Hasılat: ${humanizeTRY(bundle.latestFinancials.t
 
 ### DCF DEĞERLEME (kodda hesaplandı)
 ${dcfBlock}
+
+### DEĞERLEME & KALİTE (kodda)
+${valuationBlock}
 
 ### 12 AYLIK HEDEF FİYAT ARALIĞI (kodda)
 ${targetBlock}
