@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+torch --index-url https://download.pytorch.org/whl/cpu
+yfinance
+pandas
+git+https://github.com/amazon-science/chronos-forecasting.git

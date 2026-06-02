@@ -34,6 +34,33 @@ export async function executeChronosForecast(tickerSymbol: string, daysToForecas
     const ticker = tickerSymbol.trim().toUpperCase();
     const days = Math.min(365, Math.max(1, Math.floor(daysToForecast)));
     
+    // 1) Eğer dış API yapılandırılmışsa API'ye istek at
+    const apiUrl = process.env.CHRONOS_API_URL;
+    if (apiUrl) {
+      const apiKey = process.env.CHRONOS_API_KEY || '';
+      
+      const response = await fetch(`${apiUrl}/forecast?ticker=${encodeURIComponent(ticker)}&days=${days}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errText = await response.text();
+        return { success: false, error: `Chronos API Hatası (${response.status}): ${errText}` };
+      }
+      
+      const json = await response.json();
+      if (json.status === 'success') {
+        return { success: true, data: json.data };
+      } else {
+        return { success: false, error: json.message || 'API bilinmeyen hata döndürdü.' };
+      }
+    }
+
+    // 2) API yoksa yerel (lokal) fallback script'ini çalıştır (Mac için vs.)
     const venvPython = join(process.cwd(), '.venv', 'bin', 'python');
     const scriptPath = join(process.cwd(), 'src', 'python', 'chronos_forecast.py');
 
