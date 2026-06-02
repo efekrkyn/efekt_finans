@@ -5,7 +5,7 @@ import { getReportBundle } from './utils/report-data';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { checkEnv } from './utils/env-check';
 import { fmpClient } from './utils/fmp.js';
-import yahooFinance from 'yahoo-finance2';
+import { yahooFinance } from './utils/yahoo.js';
 
 checkEnv();
 process.on('unhandledRejection', r => console.error('unhandledRejection', String(r)));
